@@ -448,6 +448,34 @@ class TestQueryClassicalText:
         r = _parse(query_classical_text_tool(""))
         assert r["count"] == 0 or "results" in r
 
+    def test_yuanhai_ziping(self):
+        """渊海子平应能查到真实条目（回归：曾因 data_map 漏注册数据源而返回「未找到古籍」）。"""
+        r = _parse(query_classical_text_tool("渊海子平"))
+        assert r["source"] == "渊海子平"
+        results = r["results"]
+        # 必须是真实条目，而非 error/context 占位
+        assert results, "渊海子平应返回条目"
+        assert all("error" not in item and "context" not in item for item in results)
+        assert any(item.get("原文") for item in results)
+
+    def test_yuanhai_ziping_category_geju_alias(self):
+        """复现报告中的具体调用：query(渊海子平, 格局) 应经别名映射到论法/总论返回真实条目，不再报「未找到古籍」。"""
+        r = _parse(query_classical_text_tool("渊海子平", "格局"))
+        results = r["results"]
+        assert "未找到古籍" not in str(results)
+        assert results and all("error" not in item and "context" not in item for item in results)
+        # 别名命中的条目分类应落在论法/总论
+        for item in results:
+            assert item.get("category") in ("论法", "总论")
+
+    def test_ziping_zhenquan_geju_not_aliased(self):
+        """子平真诠本身有「格局」正式分类，不应被别名逻辑波及，按原值精确匹配。"""
+        r = _parse(query_classical_text_tool("子平真诠", "格局"))
+        results = r["results"]
+        assert results and all("error" not in item and "context" not in item for item in results)
+        for item in results:
+            assert item.get("category") == "格局"
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # 10. query_qiongtong_guidance
