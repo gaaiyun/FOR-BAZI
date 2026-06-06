@@ -35,6 +35,7 @@ _qiongtong_data = _load_json("qiongtong_baojian.json")
 _disitian_data = _load_json("di_tian_sui.json")
 _ziping_data = _load_json("ziping_zhenquan.json")
 _sanming_data = _load_json("sanming_tonghui.json")
+_yuanhai_data = _load_json("yuanhai_ziping.json")
 
 # ── 穷通宝鉴：从 JSON 构建索引 ────────────────────────────────
 # 原始 JSON 格式: entries["甲日_寅月"] = { "原文": "..." }
@@ -381,11 +382,21 @@ def get_sanming_for_tool(category: str, key: str) -> Dict[str, Any]:
     }
 
 
+# 跨古籍分类别名：部分古籍未单独设「格局」等分类，相关论述散见于其他分类。
+# 例：渊海子平的格局论命内容归于「论法」「总论」，故 category=格局 映射到这两类。
+# （子平真诠本身设有「格局」正式分类，不在此映射，按原值精确匹配。）
+_CATEGORY_ALIASES: Dict[str, Dict[str, List[str]]] = {
+    "渊海子平": {
+        "格局": ["论法", "总论"],
+    },
+}
+
+
 def query_classical_text(source: str, category: str = "", key: str = "") -> List[Dict[str, Any]]:
     """
     通用古籍查询函数。
-    source: 古籍名（穷通宝鉴/滴天髓/子平真诠/三命通会）
-    category: 分类筛选
+    source: 古籍名（穷通宝鉴/滴天髓/子平真诠/三命通会/渊海子平）
+    category: 分类筛选（支持别名，如渊海子平的「格局」→「论法/总论」）
     key: 键名筛选
     """
     data_map = {
@@ -393,6 +404,7 @@ def query_classical_text(source: str, category: str = "", key: str = "") -> List
         "滴天髓": _disitian_data,
         "子平真诠": _ziping_data,
         "三命通会": _sanming_data,
+        "渊海子平": _yuanhai_data,
     }
 
     data = data_map.get(source, {})
@@ -402,9 +414,16 @@ def query_classical_text(source: str, category: str = "", key: str = "") -> List
     entries = data.get("entries", {})
     results = []
 
+    # 解析分类别名（如渊海子平「格局」→「论法/总论」），未命中别名时即为原值精确匹配
+    allowed_categories = set()
+    if category:
+        allowed_categories = {category} | set(
+            _CATEGORY_ALIASES.get(source, {}).get(category, [])
+        )
+
     for entry_key, entry in entries.items():
-        # 按分类筛选
-        if category and entry.get("category", "") != category:
+        # 按分类筛选（含别名）
+        if category and entry.get("category", "") not in allowed_categories:
             continue
         # 按键名筛选
         if key and key not in entry_key and key not in entry.get("key", ""):
