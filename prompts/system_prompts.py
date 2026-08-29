@@ -2,6 +2,7 @@
 """
 专业命理 Prompt 体系：可组合的 persona、输出结构、工具与 ReAct 指引。
 """
+import json
 from typing import Any, Dict
 
 from .ancient_texts import (
@@ -75,6 +76,24 @@ def _section_params(bazi_data: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _computed_geju_name(bazi_data: Dict[str, Any]) -> str:
+    """
+    取 ``analyze_geju`` 已算好的格局名（它会检查透干，比按月令本气查表准确）。
+
+    命盘里若已带 ``geju`` 字段就直接用，否则现算一次。任何异常都退回空串，
+    让子平真诠查表走本气兜底——古籍段落不该因为格局算不出来就整段消失。
+    """
+    geju = bazi_data.get("geju")
+    if isinstance(geju, dict) and geju.get("格局名称"):
+        return str(geju["格局名称"])
+    try:
+        from tools.geju_analyzer import analyze_geju
+
+        return str(json.loads(analyze_geju(bazi_data)).get("格局名称", ""))
+    except Exception:
+        return ""
+
+
 def _ancient_section(bazi_data: Dict[str, Any]) -> str:
     """古籍参考段落：穷通宝鉴 + 滴天髓 + 子平真诠 + 三命通会。"""
     day_master = (bazi_data.get("day_master") or "").strip()
@@ -87,7 +106,11 @@ def _ancient_section(bazi_data: Dict[str, Any]) -> str:
     disitian = get_disitian_sui_guidance(day_master, month_zhi)
     if disitian:
         parts.append(disitian)
-    ziping = get_ziping_pattern_guidance(day_master, month_zhi)
+    # 把已算出的格局传给子平真诠查表，避免"取格看透干"与"查表看本气"
+    # 各说各话，在同一份提示词里留下互斥结论。
+    ziping = get_ziping_pattern_guidance(
+        day_master, month_zhi, _computed_geju_name(bazi_data)
+    )
     if ziping:
         parts.append(ziping)
     # 三命通会：日柱论命

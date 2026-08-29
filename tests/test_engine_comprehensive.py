@@ -39,7 +39,7 @@ from tools.geju_analyzer import analyze_geju as geju_fn
 # ════════════════════════════════════════════════════════════════════════════
 
 TEST_CASES = [
-    (2002, 7, 21, 3, 30, "乾造 (Male)", "Male 2002-07-21 03:30"),
+    (1985, 6, 15, 9, 20, "乾造 (Male)", "Male 1985-06-15 09:20"),
     (2000, 3, 15, 12, 0, "坤造 (Female)", "Female 2000-03-15 12:00"),
     (1990, 1, 1, 0, 0, "乾造 (Male)", "Male 1990-01-01 00:00 (new year edge)"),
     (2024, 2, 10, 23, 59, "坤造 (Female)", "Female 2024-02-10 23:59 (lunar new year edge)"),
@@ -47,32 +47,32 @@ TEST_CASES = [
 
 # Known expected values from independent verification with lunar_python
 EXPECTED_PILLARS = {
-    "Male 2002-07-21 03:30": ["壬午", "丁未", "庚寅", "戊寅"],
+    "Male 1985-06-15 09:20": ["乙丑", "壬午", "乙酉", "辛巳"],
     "Female 2000-03-15 12:00": ["庚辰", "己卯", "壬申", "丙午"],
     "Male 1990-01-01 00:00 (new year edge)": ["己巳", "丙子", "丙寅", "戊子"],
     "Female 2024-02-10 23:59 (lunar new year edge)": ["甲辰", "丙寅", "甲辰", "丙子"],
 }
 
 EXPECTED_DAY_MASTER = {
-    "Male 2002-07-21 03:30": "庚",
+    "Male 1985-06-15 09:20": "乙",
     "Female 2000-03-15 12:00": "壬",
     "Male 1990-01-01 00:00 (new year edge)": "丙",
     "Female 2024-02-10 23:59 (lunar new year edge)": "甲",
 }
 
 EXPECTED_TG_GAN = {
-    "Male 2002-07-21 03:30": ["食神", "正官", "日主", "偏印"],
+    "Male 1985-06-15 09:20": ["比肩", "正印", "日主", "七杀"],
     "Female 2000-03-15 12:00": ["偏印", "正官", "日主", "偏财"],
     "Male 1990-01-01 00:00 (new year edge)": ["伤官", "比肩", "日主", "食神"],
     "Female 2024-02-10 23:59 (lunar new year edge)": ["比肩", "食神", "日主", "食神"],
 }
 
 EXPECTED_TG_ZHI = {
-    "Male 2002-07-21 03:30": [
-        "正官 正印",
-        "正印 正官 正财",
-        "偏财 七杀 偏印",
-        "偏财 七杀 偏印",
+    "Male 1985-06-15 09:20": [
+        "偏财 偏印 七杀",
+        "食神 偏财",
+        "七杀",
+        "伤官 正官 正财",
     ],
     "Female 2000-03-15 12:00": [
         "七杀 伤官 劫财",
@@ -95,14 +95,14 @@ EXPECTED_TG_ZHI = {
 }
 
 EXPECTED_NAYIN = {
-    "Male 2002-07-21 03:30": ["杨柳木", "天河水", "松柏木", "城头土"],
+    "Male 1985-06-15 09:20": ["海中金", "杨柳木", "泉中水", "白蜡金"],
     "Female 2000-03-15 12:00": ["白蜡金", "城头土", "剑锋金", "天河水"],
     "Male 1990-01-01 00:00 (new year edge)": ["大林木", "涧下水", "炉中火", "霹雳火"],
     "Female 2024-02-10 23:59 (lunar new year edge)": ["覆灯火", "炉中火", "覆灯火", "涧下水"],
 }
 
 EXPECTED_WUXING = {
-    "Male 2002-07-21 03:30": {"金(Metal)": 1, "木(Wood)": 2, "水(Water)": 1, "火(Fire)": 2, "土(Earth)": 2},
+    "Male 1985-06-15 09:20": {"金(Metal)": 2, "木(Wood)": 2, "水(Water)": 1, "火(Fire)": 2, "土(Earth)": 1},
     "Female 2000-03-15 12:00": {"金(Metal)": 2, "木(Wood)": 1, "水(Water)": 1, "火(Fire)": 2, "土(Earth)": 2},
     "Male 1990-01-01 00:00 (new year edge)": {"金(Metal)": 0, "木(Wood)": 1, "水(Water)": 2, "火(Fire)": 3, "土(Earth)": 2},
     "Female 2024-02-10 23:59 (lunar new year edge)": {"金(Metal)": 0, "木(Wood)": 3, "水(Water)": 1, "火(Fire)": 2, "土(Earth)": 2},
@@ -138,7 +138,7 @@ class TestEngineOutputFormat:
 
     @pytest.fixture(scope="class")
     def sample_chart(self):
-        return _make_chart(2002, 7, 21, 3, 30, "乾造 (Male)")
+        return _make_chart(1985, 6, 15, 9, 20, "乾造 (Male)")
 
     def test_all_required_keys_present(self, sample_chart):
         missing = self.REQUIRED_KEYS - set(sample_chart.keys())
@@ -373,7 +373,7 @@ class TestBaziService:
 
     @pytest.fixture
     def service_result(self):
-        return calculate_chart("2002-07-21 03:30", "乾造 (Male)")
+        return calculate_chart("1985-06-15 09:20", "乾造 (Male)")
 
     def test_result_has_chart_key(self, service_result):
         assert "chart" in service_result
@@ -404,7 +404,7 @@ class TestBaziService:
 
     def test_chart_data_matches_engine(self, service_result):
         """Service chart data should match direct engine output."""
-        dt = datetime(2002, 7, 21, 3, 30)
+        dt = datetime(1985, 6, 15, 9, 20)
         direct = calculate_professional_bazi(dt, "乾造 (Male)")
         assert service_result["chart"]["pillars"] == direct["pillars"]
         assert service_result["chart"]["day_master"] == direct["day_master"]
@@ -421,7 +421,7 @@ class TestBaziService:
 
     def test_invalid_format_raises(self):
         with pytest.raises(ValueError):
-            calculate_chart("2002/07/21 03:30", "乾造 (Male)")
+            calculate_chart("1985/06/15 09:20", "乾造 (Male)")
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -432,37 +432,37 @@ class TestSystemPrompt:
     """Verify system prompt contains correct engine data."""
 
     @pytest.fixture
-    def chart_2002(self):
-        return _make_chart(2002, 7, 21, 3, 30, "乾造 (Male)")
+    def chart_male(self):
+        return _make_chart(1985, 6, 15, 9, 20, "乾造 (Male)")
 
     @pytest.fixture
-    def prompt_2002(self, chart_2002):
-        return build_system_prompt(chart_2002)
+    def prompt_2002(self, chart_male):
+        return build_system_prompt(chart_male)
 
-    def test_prompt_contains_day_master(self, prompt_2002, chart_2002):
-        assert chart_2002["day_master"] in prompt_2002
+    def test_prompt_contains_day_master(self, prompt_2002, chart_male):
+        assert chart_male["day_master"] in prompt_2002
 
     def test_prompt_contains_gender(self, prompt_2002):
         assert "乾造 (Male)" in prompt_2002
 
-    def test_prompt_contains_pillars(self, prompt_2002, chart_2002):
-        for pillar in chart_2002["pillars"]:
+    def test_prompt_contains_pillars(self, prompt_2002, chart_male):
+        for pillar in chart_male["pillars"]:
             assert pillar in prompt_2002, f"Pillar {pillar} missing from prompt"
 
-    def test_prompt_contains_nayin(self, prompt_2002, chart_2002):
-        for n in chart_2002["nayin"]:
+    def test_prompt_contains_nayin(self, prompt_2002, chart_male):
+        for n in chart_male["nayin"]:
             assert n in prompt_2002, f"Nayin {n} missing from prompt"
 
-    def test_prompt_contains_minggong(self, prompt_2002, chart_2002):
-        assert chart_2002["minggong"] in prompt_2002
+    def test_prompt_contains_minggong(self, prompt_2002, chart_male):
+        assert chart_male["minggong"] in prompt_2002
 
-    def test_prompt_contains_taiyuan(self, prompt_2002, chart_2002):
-        assert chart_2002["taiyuan"] in prompt_2002
+    def test_prompt_contains_taiyuan(self, prompt_2002, chart_male):
+        assert chart_male["taiyuan"] in prompt_2002
 
-    def test_prompt_contains_dayun(self, prompt_2002, chart_2002):
+    def test_prompt_contains_dayun(self, prompt_2002, chart_male):
         """Prompt should contain at least the first dayun ganzhi."""
-        if chart_2002["dayun"]:
-            assert chart_2002["dayun"][0]["ganzhi"] in prompt_2002
+        if chart_male["dayun"]:
+            assert chart_male["dayun"][0]["ganzhi"] in prompt_2002
 
     def test_prompt_contains_persona(self, prompt_2002):
         assert "玄冥" in prompt_2002
@@ -492,8 +492,8 @@ class TestToolsWithEngineOutput:
     """Verify tools work with raw engine output (not normalized frontend data)."""
 
     @pytest.fixture
-    def chart_2002(self):
-        return _make_chart(2002, 7, 21, 3, 30, "乾造 (Male)")
+    def chart_male(self):
+        return _make_chart(1985, 6, 15, 9, 20, "乾造 (Male)")
 
     @pytest.fixture
     def chart_2000(self):
@@ -515,36 +515,36 @@ class TestToolsWithEngineOutput:
 
     # -- get_dayun_stage --
 
-    def test_dayun_stage_2026(self, chart_2002):
-        result = json.loads(get_dayun_stage(chart_2002, 2026))
+    def test_dayun_stage_2026(self, chart_male):
+        result = json.loads(get_dayun_stage(chart_male, 2026))
         assert result["current_year"] == 2026
         assert result["step"] is not None
         assert "ganzhi" in result
-        assert result["step"] == 2  # 2nd dayun: 己酉 starting 2018
+        assert result["step"] == 4  # 4th dayun: 戊寅 starting 2018
 
-    def test_dayun_stage_before_first(self, chart_2002):
-        """Year before first dayun (2008) returns no active stage."""
-        result = json.loads(get_dayun_stage(chart_2002, 2005))
-        # First dayun starts at 2008, so 2005 has no match -> step is None
+    def test_dayun_stage_before_first(self, chart_male):
+        """Year before first dayun (1988) returns no active stage."""
+        result = json.loads(get_dayun_stage(chart_male, 1986))
+        # First dayun starts at 1988, so 1986 has no match -> step is None
         assert result["step"] is None
 
-    def test_dayun_stage_during_first(self, chart_2002):
+    def test_dayun_stage_during_first(self, chart_male):
         """Year during first dayun should return step 1."""
-        result = json.loads(get_dayun_stage(chart_2002, 2010))
+        result = json.loads(get_dayun_stage(chart_male, 1990))
         assert result["step"] == 1
 
     # -- analyze_wuxing_balance --
 
-    def test_wuxing_balance_structure(self, chart_2002):
-        result = json.loads(analyze_wuxing_balance(chart_2002))
+    def test_wuxing_balance_structure(self, chart_male):
+        result = json.loads(analyze_wuxing_balance(chart_male))
         assert "wuxing" in result
         assert "total" in result
         assert "strong" in result
         assert "weak" in result
         assert "balanced" in result
 
-    def test_wuxing_balance_total(self, chart_2002):
-        result = json.loads(analyze_wuxing_balance(chart_2002))
+    def test_wuxing_balance_total(self, chart_male):
+        result = json.loads(analyze_wuxing_balance(chart_male))
         assert result["total"] == 8
 
     def test_wuxing_balance_with_zero_element(self, chart_2000):
@@ -570,25 +570,41 @@ class TestToolsWithEngineOutput:
 
     # -- query_xing_chong_he_hai --
 
-    def test_xingchong_structure(self, chart_2002):
-        result = json.loads(query_xing_chong_he_hai(chart_2002))
+    def test_xingchong_structure(self, chart_male):
+        result = json.loads(query_xing_chong_he_hai(chart_male))
         assert "xingchong" in result
         assert "summary" in result
         assert isinstance(result["summary"], list)
 
-    def test_xingchong_known_relation(self, chart_2002):
-        """2002 chart has 年月六合(午未)."""
-        result = json.loads(query_xing_chong_he_hai(chart_2002))
+    def test_xingchong_known_relation(self, chart_male):
+        """The 1985 chart has 巳酉丑三合(金局)."""
+        result = json.loads(query_xing_chong_he_hai(chart_male))
         xc = result["xingchong"]
-        assert len(xc["合"]) > 0, "Expected 合 relations for 2002 chart"
+        assert len(xc["三合"]) > 0, "Expected 三合 relations for the 1985 chart"
 
-    def test_xingchong_with_type_filter(self, chart_2002):
-        result = json.loads(query_xing_chong_he_hai(chart_2002, "合"))
+    def test_xingchong_with_type_filter(self, chart_male):
+        result = json.loads(query_xing_chong_he_hai(chart_male, "合"))
         assert "relation_type" in result
         assert result["relation_type"] == "合"
         assert "description" in result
 
     # -- explain_shensha --
+
+    def test_every_emitted_shensha_is_explainable(self):
+        """The engine must not surface a star the glossary cannot explain."""
+        emitted = set()
+        for _label, chart in _all_chart_data():
+            for group in (chart.get("shensha_detail") or {}).values():
+                emitted.update(s for s in group if s)
+            emitted.update(s for s in (chart.get("shensha") or []) if s)
+
+        unexplained = [
+            name for name in sorted(emitted)
+            if "description" not in json.loads(explain_shensha(name))
+        ]
+        assert not unexplained, (
+            f"Engine emits shensha with no glossary entry: {unexplained}"
+        )
 
     def test_explain_taohua(self):
         result = json.loads(explain_shensha("桃花"))
@@ -612,8 +628,8 @@ class TestToolsWithEngineOutput:
 
     # -- calculate_wuxing_power (via dispatch) --
 
-    def test_wuxing_power_dispatch(self, chart_2002):
-        result_str = dispatch_tool("calculate_wuxing_power", {}, chart_2002)
+    def test_wuxing_power_dispatch(self, chart_male):
+        result_str = dispatch_tool("calculate_wuxing_power", {}, chart_male)
         result = json.loads(result_str)
         assert "power" in result
         power = result["power"]
@@ -624,8 +640,8 @@ class TestToolsWithEngineOutput:
 
     # -- analyze_geju (via dispatch) --
 
-    def test_geju_dispatch(self, chart_2002):
-        result_str = dispatch_tool("analyze_geju", {}, chart_2002)
+    def test_geju_dispatch(self, chart_male):
+        result_str = dispatch_tool("analyze_geju", {}, chart_male)
         result = json.loads(result_str)
         assert "格局类型" in result
         assert "格局名称" in result
@@ -634,8 +650,8 @@ class TestToolsWithEngineOutput:
 
     # -- query_qiongtong_guidance (via dispatch) --
 
-    def test_qiongtong_dispatch(self, chart_2002):
-        result_str = dispatch_tool("query_qiongtong_guidance", {}, chart_2002)
+    def test_qiongtong_dispatch(self, chart_male):
+        result_str = dispatch_tool("query_qiongtong_guidance", {}, chart_male)
         result = json.loads(result_str)
         # Should return some structured result (even if empty guidance)
         assert isinstance(result, dict)
@@ -712,11 +728,12 @@ class TestWuxingCalculator:
         )
 
     def test_strong_and_weak_labels(self):
-        chart = _make_chart(2002, 7, 21, 3, 30, "乾造 (Male)")
+        # This chart spans a wide power range, so it exercises both labels.
+        chart = _make_chart(1990, 1, 1, 0, 0, "乾造 (Male)")
         result = json.loads(wuxing_power_fn(chart))
-        # Fire should be strong (47.5%)
+        # Fire dominates (~40.9%)
         assert "火" in result["strong"], "Fire should be classified as strong"
-        # Gold should be weak (3.8%)
+        # Metal is negligible (~2.3%)
         assert "金" in result["weak"], "Metal should be classified as weak"
 
 
@@ -744,11 +761,85 @@ class TestGejuAnalyzer:
         assert "日主强弱" in result
         assert "日主力量占比" in result
 
-    def test_geju_2002_day_master_weak(self):
-        """2002 chart (庚 day master) should show weak day master."""
-        chart = _make_chart(2002, 7, 21, 3, 30, "乾造 (Male)")
+    def test_geju_reports_day_master_strength(self):
+        chart = _make_chart(1985, 6, 15, 9, 20, "乾造 (Male)")
         result = json.loads(geju_fn(chart))
-        assert "身弱" in result["日主强弱"] or "从格" in result["格局类型"]
+        assert result["日主强弱"] in ("身旺", "身弱", "中和")
+
+    # -- 判定口径：取格与强弱是两个维度，不得互相覆盖 --
+
+    @pytest.mark.parametrize(
+        "year,month,day,hour,minute,gender,label",
+        TEST_CASES,
+        ids=[tc[-1] for tc in TEST_CASES],
+    )
+    def test_geju_name_is_always_a_real_verdict(
+        self, year, month, day, hour, minute, gender, label
+    ):
+        """格局名称必须是结论，不能是「需细辨」这类待办。"""
+        chart = _make_chart(year, month, day, hour, minute, gender)
+        result = json.loads(geju_fn(chart))
+        name = result["格局名称"]
+        assert name, f"{label}: 格局名称为空"
+        for hedge in ("需细辨", "等", "/"):
+            assert hedge not in name, f"{label}: 格局名称仍是待办而非结论 -> {name}"
+
+    # 壬日主生巳月：巳藏 丙(本气) 庚 戊。本气丙不透，年干戊透 → 取七杀格。
+    # 若只按本气查表会得偏财格，两者喜忌相反，正好用来钉住取格口径。
+    CONG_EDGE_CASE = (1988, 5, 27, 9, 20, "乾造 (Male)")
+
+    def test_strength_never_overwrites_pattern(self):
+        """身弱不得把已取到的格局名覆盖掉。"""
+        result = json.loads(geju_fn(_make_chart(*self.CONG_EDGE_CASE)))
+        assert result["日主强弱"] == "身弱"
+        assert result["格局名称"] == "七杀格"
+        assert result["透干位置"] == "年干"
+
+    def test_yang_day_master_with_support_is_not_cong(self):
+        """阳干见印比生扶即不作从格论——传统硬判准。"""
+        result = json.loads(geju_fn(_make_chart(*self.CONG_EDGE_CASE)))
+        assert result["日主力量占比"] < 15, "此例应触发从格的力量条件"
+        support = result["生扶力量"]
+        assert support["印星"] or support["比劫"], "此例命局确有生扶"
+        assert result["从格判定"] == "非从格"
+        assert "阳干" in result["context"]
+
+    def test_ziping_guidance_matches_computed_pattern(self):
+        """古籍查表结论必须与取格结论一致，否则提示词自相矛盾。"""
+        from prompts.ancient_texts import get_ziping_pattern_guidance
+
+        chart = _make_chart(*self.CONG_EDGE_CASE)
+        computed = json.loads(geju_fn(chart))["格局名称"]
+        assert computed in build_system_prompt(chart)
+
+        aligned = get_ziping_pattern_guidance("壬", "巳", computed)
+        assert computed in aligned
+        assert "取格（含透干）" in aligned
+
+        # 没拿到格局时才退回本气粗判——此例本气会给出不同的格，
+        # 正是旧实现让提示词自相矛盾的原因。
+        naive = get_ziping_pattern_guidance("壬", "巳")
+        assert "月令本气" in naive
+        assert computed not in naive
+
+    @pytest.mark.parametrize(
+        "year,month,day,hour,minute,gender,label",
+        TEST_CASES,
+        ids=[tc[-1] for tc in TEST_CASES],
+    )
+    def test_ziping_tool_agrees_with_geju_tool(
+        self, year, month, day, hour, minute, gender, label
+    ):
+        """两个工具给模型的格名必须一致，否则它会写成「A格 / B格」两头下注。"""
+        from tools.bazi_tools import query_ziping_guidance
+
+        chart = _make_chart(year, month, day, hour, minute, gender)
+        computed = json.loads(geju_fn(chart))["格局名称"]
+        ziping = json.loads(query_ziping_guidance(chart))
+        assert ziping.get("geju_name") == computed, (
+            f"{label}: 取格={computed} 但子平真诠工具={ziping.get('geju_name')}"
+        )
+        assert ziping.get("依据") == "取格（含透干）"
 
     def test_geju_1990_has_month_zhi(self):
         """Geju should reference the correct month branch."""

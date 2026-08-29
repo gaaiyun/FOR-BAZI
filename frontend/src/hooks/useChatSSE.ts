@@ -94,6 +94,11 @@ export function useChatSSE(options: UseChatSSEOptions): UseChatSSEReturn {
 
       let accumulated = "";
 
+      // The transport is always SSE — the backend exposes no non-streaming
+      // chat route. This flag controls whether partial tokens are *rendered*
+      // as they arrive, matching the settings copy ("启用后AI回复将实时显示").
+      const renderLive = provider.streaming !== false;
+
       try {
         await chatStream(
           {
@@ -105,7 +110,7 @@ export function useChatSSE(options: UseChatSSEOptions): UseChatSSEReturn {
           // onToken
           (token: string) => {
             accumulated += token;
-            setTokens(accumulated);
+            if (renderLive) setTokens(accumulated);
           },
           // onStatus
           (statusText: string) => {

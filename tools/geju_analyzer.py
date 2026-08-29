@@ -30,9 +30,80 @@ except Exception:
     }
 
 
+# 阳干日主。传统判准：阳干只要四柱见一点印或比劫之助，即不舍命相从，
+# 故阳干不可轻言从格（阴干在全无生助时尚可入「假从」）。
+YANG_GAN = {"甲", "丙", "戊", "庚", "壬"}
+
+# 五行生克。用于把「最旺的五行」翻译成它对日主的十神关系，
+# 从而给出确定的从格名称，而不是「需细辨」。
+_SHENG = {"木": "火", "火": "土", "土": "金", "金": "水", "水": "木"}
+_KE = {"木": "土", "土": "水", "水": "火", "火": "金", "金": "木"}
+
+_YIN_SHISHEN = {"正印", "偏印"}
+_BIJIE_SHISHEN = {"比肩", "劫财"}
+
+
+def _all_other_stems(pillars: List[str]) -> List[str]:
+    """四柱中除日干以外的全部天干与地支藏干。"""
+    stems: List[str] = []
+    for idx, pillar in enumerate(pillars):
+        if not pillar:
+            continue
+        gan = pillar[0] if len(pillar) >= 1 else ""
+        zhi = pillar[1] if len(pillar) >= 2 else ""
+        # 日干本身不算「帮扶」，但日支藏干算。
+        if gan and idx != 2:
+            stems.append(gan)
+        if zhi:
+            stems.extend(ZHI_HIDDEN_STEMS.get(zhi, []))
+    return stems
+
+
+def _support_for_day_master(day_master: str, pillars: List[str]) -> Dict[str, List[str]]:
+    """找出命局中所有生扶日主的力量（印星与比劫）。"""
+    table = SHISHEN_MAP.get(day_master, {}) or {}
+    yin: List[str] = []
+    bijie: List[str] = []
+    for stem in _all_other_stems(pillars):
+        name = table.get(stem, "")
+        if name in _YIN_SHISHEN:
+            yin.append(stem)
+        elif name in _BIJIE_SHISHEN:
+            bijie.append(stem)
+    return {"印星": yin, "比劫": bijie}
+
+
+def _cong_name(day_master_elem: str, dominant_elem: str) -> str:
+    """按最旺五行与日主的生克关系，给出确定的从格名称。"""
+    if not day_master_elem or not dominant_elem:
+        return "从格"
+    if dominant_elem == day_master_elem:
+        return "从旺格（专旺）"
+    if dominant_elem == _KE.get(day_master_elem):      # 日主所克 → 财
+        return "从财格"
+    if _KE.get(dominant_elem) == day_master_elem:      # 克日主 → 官杀
+        return "从杀格"
+    if dominant_elem == _SHENG.get(day_master_elem):   # 日主所生 → 食伤
+        return "从儿格"
+    if _SHENG.get(dominant_elem) == day_master_elem:   # 生日主 → 印
+        return "从强格（从印）"
+    return "从格"
+
+
 def analyze_geju(bazi_data: Dict[str, Any]) -> str:
     """
-    格局判定：月令主气、是否透干、日主强弱 -> 正格/身旺/身弱/从格。
+    格局判定。
+
+    这里刻意把两件事分开报告，因为它们是**两个不同的维度**：
+
+      - 「格局名称」由月令取格决定（月支藏干透干 → 十神 → 格）。
+        它描述命局的结构类型，与日主强弱无关。
+      - 「日主强弱」由五行力量决定，描述日主能否担起这个结构。
+
+    旧实现会在判定身弱时用「从财/从杀/从儿等（需细辨）」覆盖掉已经算对的
+    取格结果，导致同一份提示词里出现互斥结论（取格说正印格、格局字段说从格），
+    且「需细辨」本身并不是一个结论。现在取格结果始终保留，从格另立字段，
+    且从格必须通过传统判准（阳干见印比即不从）才成立。
     """
     pillars = bazi_data.get("pillars") or []
     day_master = (bazi_data.get("day_master") or "").strip()
@@ -110,22 +181,66 @@ def analyze_geju(bazi_data: Dict[str, Any]) -> str:
     else:
         max_other_ratio = 0
 
+    # ── 日主强弱（力量占比粗判）──────────────────────────────────
     if dm_ratio >= 35:
         strength = "身旺"
-        geju_type = "正格（身旺）"
-    elif dm_ratio <= 15 and max_other_ratio >= 40:
-        strength = "身弱（从格可能）"
-        geju_type = "从格"
-        geju_name = "从财/从杀/从儿等（需细辨）"
     elif dm_ratio <= 20:
         strength = "身弱"
-        geju_type = "正格（身弱）"
     else:
         strength = "中和"
-        geju_type = "中和格"
 
+    # ── 从格判定：先看力量，再过传统判准 ────────────────────────
+    # 力量条件只是入口，不是结论。真正决定能不能从的是有无印比生扶。
+    support = _support_for_day_master(day_master, pillars)
+    has_support = bool(support["印星"] or support["比劫"])
+    dominant_elem = max(
+        ("金", "木", "水", "火", "土"),
+        key=lambda k: float(power.get(k, 0) or 0),
+    )
+
+    cong_type = "非从格"
+    cong_reason = ""
+    if dm_ratio <= 15 and max_other_ratio >= 40:
+        if not has_support:
+            cong_type = "真从"
+            cong_reason = "日主无根，且全局不见印星与比劫生扶。"
+        elif day_master in YANG_GAN:
+            cong_type = "非从格"
+            cong_reason = (
+                f"日主{day_master}为阳干，命局见"
+                f"{'印星' if support['印星'] else ''}"
+                f"{'、' if support['印星'] and support['比劫'] else ''}"
+                f"{'比劫' if support['比劫'] else ''}"
+                f"（{'、'.join(support['印星'] + support['比劫'])}）生扶。"
+                "阳干得一分生助即不舍命相从，故不作从格论，按身弱正格取用。"
+            )
+        else:
+            cong_type = "假从"
+            cong_reason = (
+                f"日主{day_master}为阴干，虽见"
+                f"{'、'.join(support['印星'] + support['比劫'])}"
+                "生扶但力弱，可作假从论，仍需兼顾印比。"
+            )
+
+    if cong_type == "真从":
+        geju_type = "从格"
+        cong_name = _cong_name(dm_elem, dominant_elem)
+    elif cong_type == "假从":
+        geju_type = "假从格"
+        cong_name = _cong_name(dm_elem, dominant_elem)
+    else:
+        geju_type = f"正格（{strength}）"
+        cong_name = ""
+
+    # 取格结果始终保留，不再被强弱判定覆盖。
     context_extra = f"透干位置：{tougan_where}。" if tougan_where else ""
-    return json.dumps({
+    cong_text = ""
+    if cong_name:
+        cong_text = f"从格倾向：{cong_name}（{cong_type}）。{cong_reason}"
+    elif cong_reason:
+        cong_text = f"曾触发从格力量条件，但不成立：{cong_reason}"
+
+    payload = {
         "格局类型": geju_type,
         "格局名称": geju_name,
         "月令": month_zhi,
@@ -134,5 +249,16 @@ def analyze_geju(bazi_data: Dict[str, Any]) -> str:
         "透干位置": tougan_where or ("月干" if is_tougan else ""),
         "日主强弱": strength,
         "日主力量占比": round(dm_ratio, 1),
-        "context": f"命局为{geju_type}，{geju_name}。月令{month_zhi}主气{month_main_qi}，{'透干' if is_tougan else '不透'}。{context_extra}日主{strength}。",
-    }, ensure_ascii=False)
+        "最旺五行": dominant_elem,
+        "从格判定": cong_type,
+        "生扶力量": support,
+        "context": (
+            f"命局取{geju_name}，为{geju_type}。"
+            f"月令{month_zhi}主气{month_main_qi}，{'透干' if is_tougan else '不透'}。"
+            f"{context_extra}日主{strength}（占比{round(dm_ratio, 1)}%），最旺五行为{dominant_elem}。"
+            f"{cong_text}"
+        ),
+    }
+    if cong_name:
+        payload["从格名称"] = cong_name
+    return json.dumps(payload, ensure_ascii=False)

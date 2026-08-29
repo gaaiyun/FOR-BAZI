@@ -55,7 +55,7 @@ Content-Type: application/json
 
 ```json
 {
-  "datetime_str": "2002-07-21 03:30",
+  "datetime_str": "1985-06-15 09:20",
   "gender": "乾造 (Male)"
 }
 ```
@@ -323,7 +323,7 @@ Content-Type: application/json
 ```json
 {
   "person_a": {
-    "datetime_str": "2002-07-21 03:30",
+    "datetime_str": "1985-06-15 09:20",
     "gender": "乾造 (Male)"
   },
   "person_b": {

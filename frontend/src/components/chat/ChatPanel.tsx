@@ -160,10 +160,17 @@ export function ChatPanel({
 function EmptyState({ hasChart }: { hasChart: boolean }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 py-12 text-center">
-      {/* Mystical icon */}
-      <div className="relative">
-        <span className="text-5xl animate-float">☰</span>
-        <div className="absolute -inset-4 rounded-full bg-[#d4af37]/5 animate-pulse-glow" />
+      {/* Brand mark — static halo, entrance only. */}
+      <div className="relative grid place-items-center">
+        <div
+          aria-hidden
+          className="absolute h-28 w-28 rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle, rgb(212 175 55 / 0.10) 0%, transparent 68%)",
+          }}
+        />
+        <span className="relative text-5xl text-[#d4af37]/90">☰</span>
       </div>
 
       {hasChart ? (

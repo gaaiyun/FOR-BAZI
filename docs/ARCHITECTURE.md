@@ -335,8 +335,8 @@ sequenceDiagram
 ```mermaid
 graph LR
     subgraph Input["用户输入 BaziInput"]
-        I_DT["birth_date: '2002-07-21'"]
-        I_TM["birth_time: '03:30'"]
+        I_DT["birth_date: '1985-06-15'"]
+        I_TM["birth_time: '09:20'"]
         I_GD["gender: 'male'"]
     end
 

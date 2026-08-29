@@ -56,7 +56,7 @@ export default function BaziCalculator() {
               <Skeleton className="h-6 w-40" />
             </CardHeader>
             <CardContent className="flex flex-col items-center gap-4 py-12">
-              <div className="animate-pulse-glow rounded-full p-6">
+              <div className="rounded-full p-6">
                 <Skeleton className="h-16 w-16 rounded-full" />
               </div>
               <Skeleton className="h-4 w-48" />

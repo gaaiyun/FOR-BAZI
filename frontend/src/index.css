@@ -165,45 +165,115 @@
 }
 
 /* ---------------------------------------------------
-   Custom Animations
+   Motion system
+
+   Two rules keep this from feeling synthetic:
+   1. Decorative motion never loops. Anything that moves
+      forever reads as a screensaver, not a product.
+   2. Motion is a response to something — entrance, hover,
+      state change — and it resolves. It does not idle.
    --------------------------------------------------- */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+:root {
+  /* Authored easings. `ease-out` on everything is the tell. */
+  --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quart: cubic-bezier(0.77, 0, 0.175, 1);
+  /* Slight overshoot — used sparingly, for elements that "land". */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --dur-fast: 140ms;
+  --dur-base: 240ms;
+  --dur-slow: 420ms;
+
+  /* Layered elevation: ambient occlusion + key light + hairline.
+     A single arbitrary glow is what makes cards look pasted on. */
+  --elev-1:
+    0 1px 2px rgb(0 0 0 / 0.28),
+    0 0 0 1px rgb(255 255 255 / 0.03) inset;
+  --elev-2:
+    0 2px 4px rgb(0 0 0 / 0.24),
+    0 8px 16px -6px rgb(0 0 0 / 0.36),
+    0 0 0 1px rgb(255 255 255 / 0.04) inset;
+  --elev-3:
+    0 4px 8px rgb(0 0 0 / 0.22),
+    0 16px 32px -10px rgb(0 0 0 / 0.44),
+    0 0 0 1px rgb(255 255 255 / 0.05) inset;
 }
 
-@keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+@keyframes rise-in {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 8px rgba(212, 175, 55, 0.3); }
-  50%      { box-shadow: 0 0 20px rgba(212, 175, 55, 0.6); }
+@keyframes settle-in {
+  from { opacity: 0; transform: translate3d(0, 14px, 0) scale(0.985); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
+@keyframes sweep {
+  from { background-position: -150% 0; }
+  to   { background-position: 250% 0; }
 }
 
-/* Utility classes for animations */
+/* Page / section entrance. */
 .animate-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
+  animation: rise-in var(--dur-slow) var(--ease-out-quart) both;
 }
 
+/*
+  Staggered entrance for grids and lists. Put `.stagger` on the
+  container; each child gets its own delay from its index.
+  Capped at 8 so a long list never crawls in.
+*/
+.stagger > * {
+  animation: settle-in var(--dur-slow) var(--ease-out-expo) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 45ms; }
+.stagger > *:nth-child(3) { animation-delay: 90ms; }
+.stagger > *:nth-child(4) { animation-delay: 135ms; }
+.stagger > *:nth-child(5) { animation-delay: 180ms; }
+.stagger > *:nth-child(6) { animation-delay: 225ms; }
+.stagger > *:nth-child(7) { animation-delay: 270ms; }
+.stagger > *:nth-child(n + 8) { animation-delay: 315ms; }
+
+/* Loading placeholder. Finite by nature — it stops when data lands. */
 .animate-shimmer {
-  background: linear-gradient(90deg, transparent 25%, rgba(212, 175, 55, 0.1) 50%, transparent 75%);
+  background: linear-gradient(
+    90deg,
+    transparent 20%,
+    rgb(212 175 55 / 0.08) 50%,
+    transparent 80%
+  );
   background-size: 200% 100%;
-  animation: shimmer 2s infinite;
+  animation: sweep 1.6s var(--ease-in-out-quart) infinite;
 }
 
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
+/* ---------------------------------------------------
+   Focus visibility — keyboard users get a real ring,
+   mouse users do not. Missing focus states are the
+   single most common production-readiness gap.
+   --------------------------------------------------- */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: calc(var(--radius) * 0.5);
+  }
 }
 
-.animate-float {
-  animation: float 3s ease-in-out infinite;
+/* ---------------------------------------------------
+   Respect the OS setting. Non-negotiable for shipping.
+   --------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ---------------------------------------------------

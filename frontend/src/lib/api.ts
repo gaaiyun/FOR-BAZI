@@ -84,6 +84,7 @@ export async function calculateBazi(input: BaziInput): Promise<BaziReading> {
  * "anthropic" maps to a recognized Anthropic provider name.
  */
 const PROVIDER_NAME_MAP: Record<string, string> = {
+  cloudflare: "Cloudflare",
   alibaba: "OpenAI",
   openai: "OpenAI",
   anthropic: "Anthropic (兼容)",

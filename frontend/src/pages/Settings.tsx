@@ -24,6 +24,17 @@ const PROVIDER_PRESETS: Record<
   AIProviderId,
   { label: string; models: string[]; baseUrl: string }
 > = {
+  // Workers AI models must support tool calling — the ReAct loop always
+  // sends tool schemas. Models without it silently ignore the tools.
+  cloudflare: {
+    label: "Cloudflare AI (免费)",
+    models: [
+      "@cf/zai-org/glm-4.7-flash",
+      "@cf/qwen/qwen3-30b-a3b-fp8",
+      "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    ],
+    baseUrl: "",
+  },
   alibaba: {
     label: "阿里云百炼",
     models: ["qwen-plus", "qwen-turbo", "qwen-max", "qwen-long"],
@@ -34,15 +45,17 @@ const PROVIDER_PRESETS: Record<
     models: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
     baseUrl: "https://api.openai.com/v1",
   },
+  // Anthropic-protocol providers: base URL must NOT end in /v1 —
+  // the SDK appends /v1/messages itself.
   anthropic: {
     label: "Anthropic",
-    models: ["claude-sonnet-4-20250514", "claude-3-5-haiku-20241022"],
+    models: ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5-20251001"],
     baseUrl: "https://api.anthropic.com",
   },
   mimo: {
     label: "MiMo",
-    models: ["MiMo-7B-RL", "MiMo-7B-SFT"],
-    baseUrl: "https://api.mimo.ai/v1",
+    models: ["mimo-v2.5-pro"],
+    baseUrl: "https://token-plan-cn.xiaomimimo.com/anthropic",
   },
   deepseek: {
     label: "DeepSeek",
@@ -150,34 +163,48 @@ export default function Settings() {
 
             <Separator />
 
-            {/* API Key */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                API Key
-              </label>
-              <Input
-                type="password"
-                placeholder="sk-..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                密钥仅存储在本地浏览器中，不会上传至服务器。
-              </p>
-            </div>
+            {provider === "cloudflare" ? (
+              <div className="rounded-md bg-[#0d1117] border border-[#30363d] p-4 space-y-2">
+                <p className="text-sm text-foreground font-medium">
+                  Cloudflare Workers AI (免费)
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  使用服务端预配置的 Cloudflare 账户，无需填写 API
+                  Key。如需切换到其他服务商，请选择上方对应按钮。
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* API Key */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    API Key
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder="sk-..."
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    密钥仅存储在本地浏览器中，不会上传至服务器。
+                  </p>
+                </div>
 
-            {/* Base URL */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                Base URL
-              </label>
-              <Input
-                type="text"
-                placeholder={preset.baseUrl || "https://..."}
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-              />
-            </div>
+                {/* Base URL */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Base URL
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder={preset.baseUrl || "https://..."}
+                    value={baseUrl}
+                    onChange={(e) => setBaseUrl(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
 
             {/* Model selector */}
             <div className="space-y-2">

@@ -13,7 +13,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.services.agent_service import _normalize_chart_data, stream_chat
+from agent.api_adapter import is_anthropic_provider
+from backend.services.agent_service import (
+    ProviderConfigError,
+    _normalize_chart_data,
+    _resolve_provider_config,
+    stream_chat,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -755,19 +761,252 @@ class TestStreamChatNormalization:
             ("回答", [], [])
         ])
 
-        list(stream_chat(
-            message="你好",
-            provider="OpenAI",
-            api_key="",
-            base_url="",
-            model="",
-        ))
+        # Patch the settings rather than relying on a developer's local .env —
+        # otherwise this passes only on machines that happen to have one.
+        with patch.multiple(
+            "backend.services.agent_service.settings",
+            OPENAI_API_KEY="settings-key",
+            OPENAI_BASE_URL="https://settings.example.com/v1",
+            OPENAI_MODEL="settings-model",
+        ):
+            list(stream_chat(
+                message="你好",
+                provider="OpenAI",
+                api_key="",
+                base_url="",
+                model="",
+            ))
 
         # Verify create_client was called with settings defaults
-        call_args = mock_create_client.call_args
-        assert call_args[0][0] == "OpenAI"
-        # api_key should be filled from settings
-        assert call_args[0][1] != ""
+        provider_arg, key_arg, url_arg = mock_create_client.call_args[0]
+        assert provider_arg == "OpenAI"
+        assert key_arg == "settings-key"
+        assert url_arg == "https://settings.example.com/v1"
+
+
+# ---------------------------------------------------------------------------
+# 5a. Streaming contract: no duplicated content, tool_call events reach the UI
+# ---------------------------------------------------------------------------
+
+
+class TestStreamingContract:
+    """The adapter's closing tuple carries the *full* accumulation, not a chunk."""
+
+    @patch("backend.services.agent_service.create_client")
+    def test_final_content_is_not_duplicated(self, mock_create_client):
+        """Joining chunks *and* the closing tuple doubled the whole answer."""
+        from agent.react_agent import run_react_loop_streaming
+
+        mock_create_client.return_value = {"type": "openai", "client": MagicMock()}
+
+        def fake_stream(client_info, model, messages, tools=None, **kwargs):
+            yield "前半段"
+            yield "后半段"
+            yield ("前半段后半段", [])  # adapter closes with the full text
+
+        with patch("agent.api_adapter.call_api_streaming", fake_stream):
+            items = list(run_react_loop_streaming(
+                client_info={"type": "openai", "client": MagicMock()},
+                model="m",
+                messages=[{"role": "user", "content": "hi"}],
+                tools=[],
+                dispatch_tool=lambda *a, **k: "{}",
+                do_fact_check=False,
+            ))
+
+        final_content = items[-1][0]
+        assert final_content == "前半段后半段"
+        assert final_content.count("前半段") == 1
+
+    @patch("backend.services.agent_service.create_client")
+    def test_tool_call_events_are_emitted(self, mock_create_client):
+        """The frontend renders tool cards from these; the backend never sent them."""
+        mock_create_client.return_value = {"type": "openai", "client": MagicMock()}
+
+        def gen():
+            yield "[STATUS] 正在调用工具 get_annual_fortune..."
+            yield {
+                "type": "tool_call", "id": "tc1", "name": "get_annual_fortune",
+                "arguments": '{"year": 2026}', "result": None, "status": "calling",
+            }
+            yield {
+                "type": "tool_call", "id": "tc1", "name": "get_annual_fortune",
+                "arguments": '{"year": 2026}', "result": '{"ganzhi":"乙巳"}',
+                "status": "done",
+            }
+            yield ("答案", [], [])
+
+        with patch(
+            "backend.services.agent_service.run_react_loop_streaming",
+            return_value=gen(),
+        ):
+            events = list(stream_chat(
+                message="2026 运势",
+                provider="OpenAI",
+                api_key="k", base_url="https://x/v1", model="m",
+                chart_data=None,
+            ))
+
+        kinds = [e[0] for e in events]
+        assert "tool_call" in kinds, "tool_call 事件必须发出，否则前端调用卡片是死的"
+
+        calls = [e[1] for e in events if e[0] == "tool_call"]
+        assert calls[0]["status"] == "calling"
+        assert calls[-1]["status"] == "done"
+        assert calls[-1]["result"]
+        # 事件载荷不应把内部的 type 字段漏给前端
+        assert "type" not in calls[0]
+
+    def test_failing_tool_does_not_kill_the_stream(self):
+        """单个工具抛异常时，流要继续并把错误回传给模型。"""
+        from agent.react_agent import run_react_loop_streaming
+
+        calls = {"n": 0}
+
+        def fake_stream(client_info, model, messages, tools=None, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                yield ("", [{
+                    "id": "tc1", "type": "function",
+                    "function": {"name": "boom", "arguments": "{}"},
+                }])
+            else:
+                yield ("收尾回答", [])
+
+        def exploding_tool(name, args, data):
+            raise RuntimeError("tool blew up")
+
+        with patch("agent.api_adapter.call_api_streaming", fake_stream):
+            items = list(run_react_loop_streaming(
+                client_info={"type": "openai", "client": MagicMock()},
+                model="m",
+                messages=[{"role": "user", "content": "hi"}],
+                tools=[],
+                dispatch_tool=exploding_tool,
+                do_fact_check=False,
+            ))
+
+        errored = [
+            i for i in items
+            if isinstance(i, dict) and i.get("status") == "error"
+        ]
+        assert errored, "工具异常应转成 status=error 的事件而不是中断"
+        assert "boom" in errored[0]["result"]
+        assert items[-1][0] == "收尾回答"
+
+
+# ---------------------------------------------------------------------------
+# 5b. Cloudflare Workers AI provider resolution
+# ---------------------------------------------------------------------------
+
+
+class TestCloudflareProviderConfig:
+    """The default provider reads its credentials from server-side settings."""
+
+    @staticmethod
+    def _generator(items):
+        def gen():
+            yield from items
+        return gen()
+
+    def test_builds_openai_compatible_base_url(self):
+        with patch.multiple(
+            "backend.services.agent_service.settings",
+            CF_ACCOUNT_ID="acct123",
+            CF_API_TOKEN="cf-token",
+            CF_MODEL="@cf/zai-org/glm-4.7-flash",
+        ):
+            key, url, model = _resolve_provider_config("Cloudflare", "", "", "")
+
+        assert key == "cf-token"
+        assert url == (
+            "https://api.cloudflare.com/client/v4/accounts/acct123/ai/v1"
+        )
+        assert model == "@cf/zai-org/glm-4.7-flash"
+
+    def test_user_supplied_values_win_over_settings(self):
+        with patch.multiple(
+            "backend.services.agent_service.settings",
+            CF_ACCOUNT_ID="acct123",
+            CF_API_TOKEN="cf-token",
+        ):
+            key, url, model = _resolve_provider_config(
+                "Cloudflare", "own-key", "https://own.example.com/v1", "own-model"
+            )
+
+        assert (key, url, model) == (
+            "own-key",
+            "https://own.example.com/v1",
+            "own-model",
+        )
+
+    def test_missing_account_id_raises_actionable_error(self):
+        with patch.multiple(
+            "backend.services.agent_service.settings",
+            CF_ACCOUNT_ID="",
+            CF_API_TOKEN="cf-token",
+        ):
+            with pytest.raises(ProviderConfigError, match="BAZI_CF_ACCOUNT_ID"):
+                _resolve_provider_config("Cloudflare", "", "", "")
+
+    def test_missing_token_raises_actionable_error(self):
+        with patch.multiple(
+            "backend.services.agent_service.settings",
+            CF_ACCOUNT_ID="acct123",
+            CF_API_TOKEN="",
+        ):
+            with pytest.raises(ProviderConfigError, match="BAZI_CF_API_TOKEN"):
+                _resolve_provider_config("Cloudflare", "", "", "")
+
+    def test_unconfigured_cloudflare_emits_error_event_not_crash(self):
+        """A missing account id must surface as an SSE error, not a 500."""
+        with patch.multiple(
+            "backend.services.agent_service.settings",
+            CF_ACCOUNT_ID="",
+            CF_API_TOKEN="",
+        ):
+            results = list(stream_chat(
+                message="你好",
+                provider="Cloudflare",
+                api_key="",
+                base_url="",
+                model="",
+                chart_data=None,
+            ))
+
+        assert [r[0] for r in results] == ["error"]
+        assert "BAZI_CF_ACCOUNT_ID" in results[0][1]["message"]
+
+    @patch("backend.services.agent_service.run_react_loop_streaming")
+    @patch("backend.services.agent_service.create_client")
+    def test_cloudflare_routes_through_openai_sdk(
+        self, mock_create_client, mock_react
+    ):
+        """Workers AI speaks the OpenAI protocol, so it must not hit the
+        Anthropic code path."""
+        mock_create_client.return_value = {"type": "openai", "client": MagicMock()}
+        mock_react.return_value = self._generator([("回答", [], [])])
+
+        with patch.multiple(
+            "backend.services.agent_service.settings",
+            CF_ACCOUNT_ID="acct123",
+            CF_API_TOKEN="cf-token",
+            CF_MODEL="@cf/zai-org/glm-4.7-flash",
+        ):
+            list(stream_chat(
+                message="你好",
+                provider="Cloudflare",
+                api_key="",
+                base_url="",
+                model="",
+                chart_data=None,
+            ))
+
+        provider_arg, key_arg, url_arg = mock_create_client.call_args[0]
+        assert provider_arg == "Cloudflare"
+        assert key_arg == "cf-token"
+        assert url_arg.endswith("/accounts/acct123/ai/v1")
+        assert not is_anthropic_provider("Cloudflare")
 
 
 # ---------------------------------------------------------------------------

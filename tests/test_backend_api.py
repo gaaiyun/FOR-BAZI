@@ -37,7 +37,7 @@ def test_chart_calculation():
     """POST /api/v1/chart with valid input should return 200 with chart data."""
     response = client.post("/api/v1/chart", json={
         "gender": "乾造 (Male)",
-        "datetime_str": "2002-07-21 03:30",
+        "datetime_str": "1985-06-15 09:20",
     })
     assert response.status_code == 200
     data = response.json()
@@ -63,7 +63,7 @@ def test_chart_invalid_gender():
     """POST /api/v1/chart with invalid gender should return 422."""
     response = client.post("/api/v1/chart", json={
         "gender": "X",
-        "datetime_str": "2002-07-21 03:30",
+        "datetime_str": "1985-06-15 09:20",
     })
     assert response.status_code == 422
 
@@ -87,7 +87,7 @@ def test_chart_response_has_wuxing_power_and_geju():
     """Chart response should include derived wuxing_power and geju analyses."""
     response = client.post("/api/v1/chart", json={
         "gender": "乾造 (Male)",
-        "datetime_str": "2002-07-21 03:30",
+        "datetime_str": "1985-06-15 09:20",
     })
     assert response.status_code == 200
     data = response.json()
@@ -106,7 +106,7 @@ def test_compatibility():
     response = client.post("/api/v1/compatibility", json={
         "person_a": {
             "gender": "乾造 (Male)",
-            "datetime_str": "2002-07-21 03:30",
+            "datetime_str": "1985-06-15 09:20",
         },
         "person_b": {
             "gender": "坤造 (Female)",
@@ -127,7 +127,7 @@ def test_compatibility_invalid_gender():
     response = client.post("/api/v1/compatibility", json={
         "person_a": {
             "gender": "X",
-            "datetime_str": "2002-07-21 03:30",
+            "datetime_str": "1985-06-15 09:20",
         },
         "person_b": {
             "gender": "坤造 (Female)",

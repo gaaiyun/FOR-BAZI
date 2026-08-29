@@ -27,10 +27,10 @@ interface SettingsActions {
 
 const DEFAULT_SETTINGS: SettingsState = {
   ai_provider: {
-    provider: "alibaba",
+    provider: "cloudflare",
     api_key: "",
-    model: "qwen-plus",
-    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    model: "@cf/zai-org/glm-4.7-flash",
+    base_url: "",
     streaming: true,
   },
   theme: "dark",

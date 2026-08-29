@@ -181,6 +181,7 @@ export interface ChatMessage {
 
 /** Supported AI provider identifiers. */
 export type AIProviderId =
+  | "cloudflare"
   | "alibaba"
   | "openai"
   | "anthropic"

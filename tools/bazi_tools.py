@@ -74,23 +74,66 @@ def get_dayun_stage(bazi_data: Dict[str, Any], current_year: int) -> str:
 
 def analyze_wuxing_balance(bazi_data: Dict[str, Any]) -> str:
     """
-    五行能量统计与平衡分析：原局五行分布、偏旺/偏弱/中和的简要判断。
+    五行分布统计。
+
+    **旺衰结论以 calculate_wuxing_power 为准。** 这里只负责「八个字里每种五行
+    各占几个」这个事实层面的问题，旺衰判断转发给带藏干、月令、十二长生加权的
+    精算函数，避免两个工具对同一命盘给出互斥结论（数量法把 8 个字平摊到 5 行，
+    平均 1.6，用「>=2 即偏旺」会把过半五行标成旺，且「计数为 0 才算弱」会漏掉
+    只有 1 个且完全无根的五行）。
+
+    仅在拿不到四柱、无法精算时，才退回数量法，并在 verdict_source 中标明。
     """
     wuxing = bazi_data.get("wuxing") or {}
     vals = list(wuxing.values())
     if not vals:
         return json.dumps({"context": "无五行数据。"}, ensure_ascii=False)
     total = sum(vals)
-    strong = [k for k, v in wuxing.items() if v >= 2]
-    weak = [k for k, v in wuxing.items() if v == 0]
-    balanced = (max(vals) - min(vals) <= 1) and total > 0
+
+    strong: list = []
+    weak: list = []
+    balanced = False
+    power: Dict[str, Any] = {}
+    verdict_source = "weighted"
+
+    try:
+        detail = json.loads(calculate_wuxing_power(bazi_data))
+        power = detail.get("power") or {}
+        # 全零表示没有可用的四柱，加权结果无意义，退回数量法。
+        if not power or sum(float(v or 0) for v in power.values()) <= 0:
+            raise ValueError("no usable power data")
+        strong = detail.get("strong") or []
+        weak = detail.get("weak") or []
+        balanced = bool(detail.get("balanced"))
+    except Exception:
+        # 没有四柱（例如只传了 wuxing 计数）时退回数量法。
+        verdict_source = "count"
+        strong = [k for k, v in wuxing.items() if v >= 2]
+        weak = [k for k, v in wuxing.items() if v == 0]
+        balanced = (max(vals) - min(vals) <= 1) and total > 0
+
+    if verdict_source == "weighted":
+        context = (
+            f"五行个数：{wuxing}（共{total}字）。"
+            f"加权力量：{power}。偏旺：{strong or '无'}；偏弱：{weak or '无'}；"
+            f"整体{'较均衡' if balanced else '有偏'}。旺衰以加权力量为准，个数仅供参考。"
+        )
+    else:
+        context = (
+            f"五行分布：{wuxing}。偏旺：{strong or '无'}；缺失：{weak or '无'}；"
+            f"整体{'较均衡' if balanced else '有偏'}。"
+            "（缺少四柱数据，未能加权精算，结论仅按个数粗判。）"
+        )
+
     return json.dumps({
         "wuxing": wuxing,
         "total": total,
+        "power": power,
         "strong": strong,
         "weak": weak,
         "balanced": balanced,
-        "context": f"五行分布：{wuxing}。偏旺：{strong or '无'}；缺失：{weak or '无'}；整体{'较均衡' if balanced else '有偏'}。"
+        "verdict_source": verdict_source,
+        "context": context,
     }, ensure_ascii=False)
 
 
@@ -142,6 +185,8 @@ def query_xing_chong_he_hai(bazi_data: Dict[str, Any], relation_type: str = "") 
     }, ensure_ascii=False)
 
 
+# Must cover every name engine/shensha.py can emit — an uncovered name makes
+# explain_shensha answer "未收录" for a star the chart actually shows.
 _SHENSHA_GLOSSARY = {
     "桃花": "子午卯酉为桃花，主异性缘、审美、情感；分墙内墙外。",
     "驿马": "寅申巳亥为驿马，主变动、出行、迁移、机遇。",
@@ -151,22 +196,44 @@ _SHENSHA_GLOSSARY = {
     "羊刃": "主刚强、胆大、易有伤灾或官非。",
     "劫煞": "主突发变故、破财、竞争。",
     "亡神": "主思虑、城府、亦主官禄。",
+    "天乙贵人": "十干中最尊之贵神，主逢凶化吉、得人提携、遇难有助。",
+    "禄神": "日主临官之位，主自立、衣食俸禄、依靠己力立身。",
 }
 
 
 def explain_shensha(shensha_name: str) -> str:
     """
     神煞名词解释。传入神煞名称（如 桃花、驿马、华盖）返回简要释义。
+
+    引擎在同一柱有多个神煞时会输出空格分隔的字符串（如「桃花 天乙贵人」），
+    因此这里同样接受多个名称，逐个解释后合并返回。
     """
-    name = shensha_name.strip()
-    desc = _SHENSHA_GLOSSARY.get(name, "")
-    if not desc:
+    raw = (shensha_name or "").strip()
+    names = [n for n in raw.split() if n]
+
+    if not names:
         return json.dumps({
-            "shensha": name,
-            "context": f"未收录「{name}」的释义。",
+            "shensha": raw,
+            "context": "未提供神煞名称。",
             "available": list(_SHENSHA_GLOSSARY.keys()),
         }, ensure_ascii=False)
-    return json.dumps({"shensha": name, "description": desc, "context": desc}, ensure_ascii=False)
+
+    known = [(n, _SHENSHA_GLOSSARY[n]) for n in names if n in _SHENSHA_GLOSSARY]
+    unknown = [n for n in names if n not in _SHENSHA_GLOSSARY]
+
+    if not known:
+        missing = "、".join(unknown)
+        return json.dumps({
+            "shensha": raw,
+            "context": f"未收录「{missing}」的释义。",
+            "available": list(_SHENSHA_GLOSSARY.keys()),
+        }, ensure_ascii=False)
+
+    description = "；".join(f"{n}：{d}" for n, d in known)
+    payload = {"shensha": raw, "description": description, "context": description}
+    if unknown:
+        payload["unrecognized"] = unknown
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def fact_check_ganzhi(claimed_ganzhi: str, year: int) -> str:
@@ -207,11 +274,23 @@ def query_disitian_guidance(bazi_data: Dict[str, Any]) -> str:
 
 
 def query_ziping_guidance(bazi_data: Dict[str, Any]) -> str:
-    """查询《子平真诠》格局论法，基于命盘日主与月令。"""
+    """
+    查询《子平真诠》格局论法，基于命盘日主与月令。
+
+    把 ``analyze_geju`` 算好的格局一并传下去 —— 取格要看透干，只按月令本气查表
+    会给出另一个格名，模型同时看到两个就会在回答里写成「A格 / B格」两头下注。
+    """
     pillars = bazi_data.get("pillars") or []
     day_master = (bazi_data.get("day_master") or "").strip()
     month_zhi = pillars[1][1] if len(pillars) > 1 and len(pillars[1]) >= 2 else ""
-    result = get_ziping_for_tool(day_master, month_zhi)
+
+    computed = ""
+    try:
+        computed = str(json.loads(analyze_geju(bazi_data)).get("格局名称", ""))
+    except Exception:
+        computed = ""
+
+    result = get_ziping_for_tool(day_master, month_zhi, computed)
     return json.dumps(result, ensure_ascii=False)
 
 

@@ -44,7 +44,14 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    # -- AI Provider (MiniMax) --
+    # -- Cloudflare Workers AI (default provider) --
+    # GLM-4.7-Flash: Chinese-native, 131K context, multi-turn tool calling.
+    # Tool calling is required — the ReAct loop passes TOOL_SCHEMAS on every turn.
+    CF_ACCOUNT_ID: str = ""
+    CF_API_TOKEN: str = ""
+    CF_MODEL: str = "@cf/zai-org/glm-4.7-flash"
+
+    # -- AI Provider (OpenAI-compatible fallback) --
     OPENAI_API_KEY: str = ""
     OPENAI_BASE_URL: str = "https://api.minimaxi.com/v1"
     OPENAI_MODEL: str = "MiniMax-M2.7"

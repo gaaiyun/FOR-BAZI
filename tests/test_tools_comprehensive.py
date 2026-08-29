@@ -217,12 +217,35 @@ class TestAnalyzeWuxingBalance:
         r = _parse(analyze_wuxing_balance(FLAT_ENGINE_DATA))
         assert "wuxing" in r
         assert r["total"] == 9  # 1+2+1+2+3
-        # strong = elements with value >= 2: 木(2), 火(2), 土(3)
-        assert "木" in r["strong"]
-        assert "火" in r["strong"]
-        assert "土" in r["strong"]
-        assert "strong" in r
+        # 个数仍原样返回，但旺衰结论改由加权精算给出，
+        # 不再用「个数 >= 2 即偏旺」这种会把过半五行标成旺的粗判。
+        assert r["verdict_source"] == "weighted"
+        assert r["power"], "weighted verdict must carry the power breakdown"
+        assert "strong" in r and "weak" in r
+        # 加权结论必须与加权力量自洽：偏旺项的力量高于偏弱项。
+        if r["strong"] and r["weak"]:
+            assert min(r["power"][e] for e in r["strong"]) > max(
+                r["power"][e] for e in r["weak"]
+            )
         _assert_has_context(r)
+
+    def test_verdict_matches_dedicated_power_tool(self):
+        """两个工具对同一命盘不得给出互斥的旺衰结论。"""
+        from tools.wuxing_calculator import calculate_wuxing_power
+
+        balance = _parse(analyze_wuxing_balance(FLAT_ENGINE_DATA))
+        power = _parse(calculate_wuxing_power(FLAT_ENGINE_DATA))
+        assert balance["strong"] == power["strong"]
+        assert balance["weak"] == power["weak"]
+        assert balance["balanced"] == power["balanced"]
+
+    def test_falls_back_to_counts_without_pillars(self):
+        """只有五行个数、没有四柱时，退回数量法并标明来源。"""
+        r = _parse(analyze_wuxing_balance({
+            "wuxing": {"金": 2, "木": 2, "水": 2, "火": 2, "土": 2}
+        }))
+        assert r["verdict_source"] == "count"
+        assert r["balanced"] is True
 
     def test_normalized_format(self):
         r = _parse(analyze_wuxing_balance(NORMALIZED_DATA))

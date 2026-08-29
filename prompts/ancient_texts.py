@@ -268,25 +268,48 @@ def _stem_relation(day_master: str, other_stem: str) -> str:
     return ""
 
 
-def get_ziping_pattern_guidance(day_master: str, month_zhi: str) -> str:
+def get_ziping_pattern_guidance(
+    day_master: str, month_zhi: str, geju_name: str = ""
+) -> str:
     """
     根据日主和月支返回《子平真诠》格局论法指引。
+
     day_master: 日主天干（如 "甲"）；month_zhi: 月支（如 "寅"）。
+    geju_name:  已由 ``analyze_geju`` 算出的格局名（如 "正官格"）。**优先使用。**
+
+    为什么需要 ``geju_name``：子平真诠取格要看**透干**，而不是只看月令本气。
+    例如庚日主生未月，未藏 己(本气)、丁(中气)、乙(余气)；若本气己不透而中气丁
+    正透月干，则应取丁为格（正官格），而非按本气己取正印格。本函数若只拿到月支，
+    只能按本气粗判，会与 ``analyze_geju`` 的结论不一致——两个结论同时进入提示词，
+    模型就只能在互斥证据里瞎挑。因此调用方应把算好的格局传进来。
     """
     if not day_master or not month_zhi:
         return ""
-    month_stem = _get_month_branch_stem(month_zhi)
-    if not month_stem:
-        return ""
-    shishen = _stem_relation(day_master, month_stem)
-    geju_name = _SHISHEN_TO_GEJU.get(shishen, "")
+
+    source = "取格（含透干）"
     if not geju_name:
-        return f"**《子平真诠》格局参考**\n月令本气{month_stem}对日主{day_master}为「{shishen}」，非八格正格，需以变格论之。"
+        month_stem = _get_month_branch_stem(month_zhi)
+        if not month_stem:
+            return ""
+        shishen = _stem_relation(day_master, month_stem)
+        geju_name = _SHISHEN_TO_GEJU.get(shishen, "")
+        source = "月令本气"
+        if not geju_name:
+            return (
+                "**《子平真诠》格局参考**\n"
+                f"月令本气{month_stem}对日主{day_master}为「{shishen}」，"
+                "非八格正格，需以变格论之。"
+            )
+
     entry = ZIPING_ZHENQUAN.get(geju_name, {})
     if not entry:
-        return ""
+        return (
+            "**《子平真诠》格局参考**\n"
+            f"命局取「{geju_name}」，非八格正格，需以变格论之。"
+        )
     return (
-        f"**《子平真诠》格局参考（{day_master}日主 月令{month_zhi} → {geju_name}）**\n"
+        f"**《子平真诠》格局参考（{day_master}日主 月令{month_zhi} → {geju_name}"
+        f"，依据：{source}）**\n"
         f"- 原文：{entry.get('原文', '')}\n"
         f"- 白话：{entry.get('白话', '')}\n"
         f"- 成格条件：{entry.get('成格条件', '')}\n"
@@ -296,15 +319,28 @@ def get_ziping_pattern_guidance(day_master: str, month_zhi: str) -> str:
     )
 
 
-def get_ziping_for_tool(day_master: str, month_zhi: str) -> Dict[str, Any]:
-    """供工具调用的结构化返回。"""
+def get_ziping_for_tool(
+    day_master: str, month_zhi: str, geju_name: str = ""
+) -> Dict[str, Any]:
+    """
+    供工具调用的结构化返回。
+
+    与 ``get_ziping_pattern_guidance`` 同理：取格要看**透干**而非只看月令本气。
+    调用方（``bazi_tools.query_ziping_guidance``）会把 ``analyze_geju`` 算好的格局
+    传进来；否则退回本气粗判，并在 ``依据`` 字段标明，免得模型拿到两个互斥的格名。
+    """
     if not day_master or not month_zhi:
         return {"context": "缺少日主或月支。"}
     month_stem = _get_month_branch_stem(month_zhi)
     if not month_stem:
         return {"context": f"无法确定月令{month_zhi}的本气藏干。"}
+
     shishen = _stem_relation(day_master, month_stem)
-    geju_name = _SHISHEN_TO_GEJU.get(shishen, "")
+    source = "取格（含透干）"
+    if not geju_name:
+        geju_name = _SHISHEN_TO_GEJU.get(shishen, "")
+        source = "月令本气"
+
     if not geju_name:
         return {
             "day_master": day_master,
@@ -312,9 +348,21 @@ def get_ziping_for_tool(day_master: str, month_zhi: str) -> Dict[str, Any]:
             "month_stem": month_stem,
             "shishen": shishen,
             "source": "子平真诠",
+            "依据": source,
             "context": f"月令本气{month_stem}对日主{day_master}为「{shishen}」，非八格正格。",
         }
+
     entry = ZIPING_ZHENQUAN.get(geju_name, {})
+    if not entry:
+        return {
+            "day_master": day_master,
+            "month_zhi": month_zhi,
+            "month_stem": month_stem,
+            "geju_name": geju_name,
+            "source": "子平真诠",
+            "依据": source,
+            "context": f"命局取「{geju_name}」，非八格正格，需以变格论之。",
+        }
     return {
         "day_master": day_master,
         "month_zhi": month_zhi,
@@ -322,13 +370,17 @@ def get_ziping_for_tool(day_master: str, month_zhi: str) -> Dict[str, Any]:
         "shishen": shishen,
         "geju_name": geju_name,
         "source": "子平真诠",
+        "依据": source,
         "原文": entry.get("原文", ""),
         "白话": entry.get("白话", ""),
         "成格条件": entry.get("成格条件", ""),
         "破格条件": entry.get("破格条件", ""),
         "喜忌": entry.get("喜忌", ""),
         "应用": entry.get("应用", ""),
-        "context": f"《子平真诠》{day_master}日主月令{month_zhi}→{geju_name}。{entry.get('白话', '')}",
+        "context": (
+            f"《子平真诠》{day_master}日主月令{month_zhi}→{geju_name}"
+            f"（依据：{source}）。{entry.get('白话', '')}"
+        ),
     }
 
 

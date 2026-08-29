@@ -7,13 +7,28 @@
   <img src="https://img.shields.io/badge/React-18-61dafb?logo=react" alt="React">
   <img src="https://img.shields.io/badge/FastAPI-0.110+-009688?logo=fastapi" alt="FastAPI">
   <img src="https://img.shields.io/badge/Tauri-v2-ffc131?logo=tauri" alt="Tauri">
-  <img src="https://img.shields.io/badge/Tests-452%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Cloudflare%20Workers%20AI-默认免费-f38020?logo=cloudflare&logoColor=white" alt="Cloudflare Workers AI">
+  <img src="https://img.shields.io/badge/Tests-462%20passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
 </p>
 
 <p align="center">
   <a href="#快速开始">快速开始</a> · <a href="docs/ARCHITECTURE.md">架构文档</a> · <a href="docs/API.md">API 文档</a> · <a href="docs/DEPLOYMENT.md">部署指南</a>
 </p>
+
+---
+
+## 这个项目做了什么
+
+八字排盘本身是**确定性计算**——四柱、藏干、纳音、神煞、大运，都由 `lunar-python` 加自研引擎算出，
+不经过大模型，因此可复现、可测试（462 个用例覆盖）。大模型只负责**在算好的命盘上做解读**，
+并且被约束成 ReAct 循环：它想引用流年干支、大运阶段、古籍原文，必须调用对应工具去取，
+不能凭印象编。`fact_check_ganzhi` 会在收尾时反查干支是否被说错。
+
+换句话说：**算的部分不让 AI 碰，说的部分不让 AI 编。**
+
+AI 服务商默认走 **Cloudflare Workers AI 免费额度**（服务端配置，用户无需自备 Key），
+同时保留自配置通道——OpenAI / Anthropic / 阿里云百炼 / DeepSeek / MiMo / 任意 OpenAI 兼容端点。
 
 ---
 
@@ -55,6 +70,7 @@ graph TB
     end
 
     subgraph LLM["AI Models"]
+        CF["Cloudflare Workers AI<br/>glm-4.7-flash · 默认免费"]
         OpenAI["OpenAI<br/>GPT-4o"]
         Anthropic["Anthropic<br/>Claude"]
         MiniMax["MiniMax<br/>M2.7"]
@@ -76,6 +92,7 @@ graph TB
     ReactLoop --> PromptEngine
     PromptEngine --> JSON
     Tools --> Chroma
+    ApiAdapter --> CF
     ApiAdapter --> OpenAI
     ApiAdapter --> Anthropic
     ApiAdapter --> MiniMax
@@ -177,7 +194,7 @@ graph LR
         RAGService["rag_service.py"]
     end
 
-    subgraph Tests["tests/ - 452 tests"]
+    subgraph Tests["tests/ - 462 tests"]
         T1["test_backend_api"]
         T2["test_engine_comprehensive"]
         T3["test_tools_comprehensive"]
@@ -232,7 +249,7 @@ FOR-BAZI/
 │   ├── classical_texts/       # 5 本古籍 JSON
 │   └── chroma_db/             # RAG 向量数据库
 │
-├── tests/                     # 452 个单元测试
+├── tests/                     # 462 个单元测试
 ├── mcp_server/                # MCP 工具服务器
 ├── docs/                      # 文档
 └── streamlit_app.py           # Streamlit 旧版
@@ -333,15 +350,36 @@ cd frontend && npm install && cd ..
 
 ### 2. 配置 `.env`
 
+默认服务商是 Cloudflare Workers AI，用它的免费额度即可跑通全部功能：
+
 ```env
-# AI 模型（至少配置一个）
+# ── 默认：Cloudflare Workers AI（免费额度）──
+BAZI_CF_ACCOUNT_ID=your-account-id      # 控制台右侧栏，或 npx wrangler whoami
+BAZI_CF_API_TOKEN=your-api-token        # 需含 Account → Workers AI → Read 权限
+BAZI_CF_MODEL=@cf/zai-org/glm-4.7-flash
+```
+
+<details>
+<summary>改用其他服务商（可选）</summary>
+
+```env
 BAZI_OPENAI_API_KEY=sk-...
 BAZI_OPENAI_BASE_URL=https://api.openai.com/v1
 BAZI_OPENAI_MODEL=gpt-4o
 
+# Anthropic 协议的 base_url 不要带 /v1，SDK 会自己拼 /v1/messages
 BAZI_ANTHROPIC_API_KEY=sk-ant-...
 BAZI_ANTHROPIC_BASE_URL=https://api.anthropic.com
 ```
+
+用户也可以在「设置」页直接填自己的 Key，前端配置优先于服务端 `.env`。
+
+</details>
+
+> **模型必须支持 function calling。** ReAct 循环每轮都会带上工具 schema，
+> 不支持工具调用的模型会静默忽略它们，导致古籍检索、流年校验等工具从不被触发。
+> 免费额度内可选：`@cf/zai-org/glm-4.7-flash`（中文原生，131K 上下文）、
+> `@cf/qwen/qwen3-30b-a3b-fp8`、`@cf/meta/llama-3.3-70b-instruct-fp8-fast`。
 
 ### 3. 启动
 
@@ -385,9 +423,9 @@ cd frontend && npx tauri build
 |---|---|
 | **前端** | React 18 · TypeScript · Vite 6 · Tailwind CSS 4 · shadcn/ui · ECharts 5 · Zustand 5 |
 | **后端** | FastAPI · uvicorn · sse-starlette · Pydantic 2 · lunar-python |
-| **AI** | OpenAI SDK · Anthropic SDK · ReAct Agent · RAG (ChromaDB + sentence-transformers) |
+| **AI** | Cloudflare Workers AI（默认）· OpenAI SDK · Anthropic SDK · ReAct Agent · RAG (ChromaDB + sentence-transformers) |
 | **桌面** | Tauri v2 · Rust · WebView2 |
-| **测试** | pytest · 452 tests · 100% 核心模块覆盖 |
+| **测试** | pytest · 462 tests · 100% 核心模块覆盖 |
 
 ---
 

@@ -135,7 +135,7 @@ export default function AIReading() {
       {/* Chart loaded but no analysis yet */}
       {reading && !hasRun && !isStreaming && (
         <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-8 text-center space-y-4">
-          <span className="text-4xl block animate-float">☱</span>
+          <span className="block text-4xl text-[#d4af37]/90">☱</span>
           <h3 className="font-heading text-lg text-[#d4af37]">
             准备就绪
           </h3>

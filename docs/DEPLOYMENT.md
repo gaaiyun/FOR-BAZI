@@ -102,7 +102,7 @@ npm run dev
 ### 5. 验证完整流程
 
 1. 打开 http://localhost:5173
-2. 输入出生信息：男，2002-07-21 03:30
+2. 输入出生信息：男，1985-06-15 09:20
 3. 点击"生成命盘"
 4. 验证命盘数据正确显示
 5. 导航到各页面验证数据渲染
@@ -349,14 +349,21 @@ npx tauri build
 
 ### .env 文件模板
 
-```env
-# ── AI 模型 API Keys ──────────────────────────────────────────────
-OPENAI_API_KEY=sk-your-openai-key-here
-ANTHROPIC_API_KEY=sk-ant-your-anthropic-key-here
+所有变量都带 `BAZI_` 前缀（见 `backend/config.py` 的 `env_prefix`）。
 
-# ── 自定义 API 地址（可选）────────────────────────────────────────
-# OPENAI_BASE_URL=https://api.openai.com/v1
-# ANTHROPIC_BASE_URL=https://api.anthropic.com
+```env
+# ── Cloudflare Workers AI（默认 AI 服务商）───────────────────────
+BAZI_CF_ACCOUNT_ID=your-cloudflare-account-id
+BAZI_CF_API_TOKEN=your-cloudflare-api-token
+BAZI_CF_MODEL=@cf/zai-org/glm-4.7-flash
+
+# ── 其他 AI 服务商（可选，用户也可在「设置」页自行填写）─────────
+BAZI_OPENAI_API_KEY=sk-your-key-here
+BAZI_OPENAI_BASE_URL=https://api.minimaxi.com/v1
+BAZI_OPENAI_MODEL=MiniMax-M2.7
+
+BAZI_ANTHROPIC_API_KEY=your-glm-api-key-here
+BAZI_ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic
 
 # ── 后端配置 ──────────────────────────────────────────────────────
 BAZI_DEBUG=false
@@ -371,13 +378,37 @@ BAZI_PORT=8000
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `OPENAI_API_KEY` | - | OpenAI API Key |
-| `ANTHROPIC_API_KEY` | - | Anthropic API Key |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 兼容 API 地址 |
+| `BAZI_CF_ACCOUNT_ID` | - | Cloudflare 账户 ID（默认服务商必填） |
+| `BAZI_CF_API_TOKEN` | - | Cloudflare API Token，需含 Workers AI 读权限 |
+| `BAZI_CF_MODEL` | `@cf/zai-org/glm-4.7-flash` | Workers AI 模型，**必须支持 function calling** |
+| `BAZI_OPENAI_API_KEY` | - | OpenAI 兼容服务商的 Key |
+| `BAZI_OPENAI_BASE_URL` | `https://api.minimaxi.com/v1` | OpenAI 兼容 API 地址 |
+| `BAZI_ANTHROPIC_API_KEY` | - | Anthropic 兼容服务商的 Key |
+| `BAZI_ANTHROPIC_BASE_URL` | `https://api.minimaxi.com/anthropic` | Anthropic 兼容地址（**不要带 `/v1`**，SDK 会自己拼 `/v1/messages`） |
 | `BAZI_DEBUG` | `false` | 调试模式（开启后日志更详细） |
 | `BAZI_HOST` | `0.0.0.0` | 后端监听地址 |
 | `BAZI_PORT` | `8000` | 后端监听端口 |
 | `BAZI_CORS_ORIGINS` | `["http://localhost:5173"]` | CORS 允许源 |
+
+### Cloudflare Workers AI 配置
+
+默认服务商走 Workers AI 的 OpenAI 兼容端点，凭据存在服务端 `.env`，用户无需在浏览器里填 Key。
+
+1. **取 Account ID**：Cloudflare 控制台右侧栏，或 `npx wrangler whoami`
+2. **建 API Token**：控制台 → My Profile → API Tokens → Create Token，
+   权限至少包含 `Account → Workers AI → Read`
+3. 填入 `.env` 后重启后端
+
+端点会拼成 `https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/ai/v1`，
+由 OpenAI SDK 以 `Authorization: Bearer <token>` 调用。
+
+> **模型必须支持 function calling。** ReAct 循环每轮都会传工具 schema，
+> 不支持工具调用的模型会静默忽略它们，导致排盘工具从不被调用。
+> 免费额度内可用且支持工具调用的：`@cf/zai-org/glm-4.7-flash`（中文原生，131K 上下文）、
+> `@cf/qwen/qwen3-30b-a3b-fp8`、`@cf/meta/llama-3.3-70b-instruct-fp8-fast`。
+> DeepSeek V4 与 GLM-5.3 Flash 需要 Workers 付费计划。
+
+未配置时不会 500——后端会通过 SSE 返回一条说明该填哪个变量的错误。
 
 ---
 

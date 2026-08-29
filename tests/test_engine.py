@@ -18,7 +18,7 @@ class TestBaziEngine:
     def test_basic_calculation(self):
         """Basic calculation should return 4 pillars."""
         from datetime import datetime
-        dt = datetime(2002, 7, 21, 3, 30)
+        dt = datetime(1985, 6, 15, 9, 20)
         result = calculate_professional_bazi(dt, "乾造 (Male)")
         assert result is not None
         assert "pillars" in result
@@ -27,7 +27,7 @@ class TestBaziEngine:
     def test_day_master(self):
         """Day master should be one of the 10 heavenly stems."""
         from datetime import datetime
-        dt = datetime(2002, 7, 21, 3, 30)
+        dt = datetime(1985, 6, 15, 9, 20)
         result = calculate_professional_bazi(dt, "乾造 (Male)")
         assert "day_master" in result
         assert result["day_master"] in "甲乙丙丁戊己庚辛壬癸"
@@ -46,7 +46,7 @@ class TestBaziEngine:
     def test_nayin(self):
         """Each pillar should have a nayin (melodic element)."""
         from datetime import datetime
-        dt = datetime(2002, 7, 21, 3, 30)
+        dt = datetime(1985, 6, 15, 9, 20)
         result = calculate_professional_bazi(dt, "乾造 (Male)")
         assert "nayin" in result
         assert len(result["nayin"]) == 4
@@ -57,7 +57,7 @@ class TestBaziEngine:
     def test_shensha(self):
         """Shensha list should be present (may be empty)."""
         from datetime import datetime
-        dt = datetime(2002, 7, 21, 3, 30)
+        dt = datetime(1985, 6, 15, 9, 20)
         result = calculate_professional_bazi(dt, "乾造 (Male)")
         assert "shensha" in result
         assert isinstance(result["shensha"], list)
@@ -65,7 +65,7 @@ class TestBaziEngine:
     def test_dayun(self):
         """Dayun list should be present with start_age and ganzhi."""
         from datetime import datetime
-        dt = datetime(2002, 7, 21, 3, 30)
+        dt = datetime(1985, 6, 15, 9, 20)
         result = calculate_professional_bazi(dt, "乾造 (Male)")
         assert "dayun" in result
         assert isinstance(result["dayun"], list)
@@ -77,7 +77,7 @@ class TestBaziEngine:
     def test_xingchong(self):
         """Xingchong dict should contain all expected relation types."""
         from datetime import datetime
-        dt = datetime(2002, 7, 21, 3, 30)
+        dt = datetime(1985, 6, 15, 9, 20)
         result = calculate_professional_bazi(dt, "乾造 (Male)")
         assert "xingchong" in result
         xc = result["xingchong"]
@@ -87,7 +87,7 @@ class TestBaziEngine:
     def test_gender_stored(self):
         """Gender string should be stored as-is in result."""
         from datetime import datetime
-        dt = datetime(2002, 7, 21, 3, 30)
+        dt = datetime(1985, 6, 15, 9, 20)
         result = calculate_professional_bazi(dt, "乾造 (Male)")
         assert result["gender"] == "乾造 (Male)"
 
@@ -101,7 +101,7 @@ class TestBaziEngine:
     def test_dishi(self):
         """DiShi (十二长生) should have 4 entries."""
         from datetime import datetime
-        dt = datetime(2002, 7, 21, 3, 30)
+        dt = datetime(1985, 6, 15, 9, 20)
         result = calculate_professional_bazi(dt, "乾造 (Male)")
         assert "dishi" in result
         assert len(result["dishi"]) == 4
@@ -109,7 +109,7 @@ class TestBaziEngine:
     def test_xunkong(self):
         """XunKong (旬空) should have 4 entries."""
         from datetime import datetime
-        dt = datetime(2002, 7, 21, 3, 30)
+        dt = datetime(1985, 6, 15, 9, 20)
         result = calculate_professional_bazi(dt, "乾造 (Male)")
         assert "xunkong" in result
         assert len(result["xunkong"]) == 4
@@ -117,7 +117,7 @@ class TestBaziEngine:
     def test_special_palaces(self):
         """MingGong, TaiYuan, TaiXi, ShenGong should be present."""
         from datetime import datetime
-        dt = datetime(2002, 7, 21, 3, 30)
+        dt = datetime(1985, 6, 15, 9, 20)
         result = calculate_professional_bazi(dt, "乾造 (Male)")
         assert "minggong" in result
         assert "taiyuan" in result

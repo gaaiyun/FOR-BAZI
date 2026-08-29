@@ -8,6 +8,9 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
+/** Injected at build time from package.json (see vite.config.ts). */
+const APP_VERSION = __APP_VERSION__;
+
 /** Navigation item definition. */
 interface NavItem {
   label: string;
@@ -39,7 +42,7 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
     title: "咨询",
     items: [
       { label: "AI 解读", path: "/ai-reading", icon: "☱", description: "AI Consultation" },
-      { label: "问事", path: "/chat", icon: "☰", description: "Chat with AI" },
+      { label: "问事", path: "/chat", icon: "☯", description: "Chat with AI" },
     ],
   },
   {
@@ -59,13 +62,23 @@ export function Sidebar() {
       )}
     >
       {/* Logo / Brand */}
-      <div className="flex items-center gap-2 px-4 py-5">
-        <span className="text-2xl text-gold animate-pulse-glow">☰</span>
-        <div className="flex flex-col">
+      <div className="flex items-center gap-3 px-4 py-5">
+        <span
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-lg text-gold"
+          style={{
+            background:
+              "linear-gradient(145deg, rgb(212 175 55 / 0.16), rgb(212 175 55 / 0.04))",
+            boxShadow: "inset 0 0 0 1px rgb(212 175 55 / 0.22)",
+          }}
+          aria-hidden
+        >
+          ☰
+        </span>
+        <div className="flex flex-col leading-tight">
           <span className="font-heading text-lg font-semibold tracking-wide text-gold">
             玄冥
           </span>
-          <span className="text-xs text-muted-foreground tracking-widest uppercase">
+          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             Ming Matrix
           </span>
         </div>
@@ -89,19 +102,36 @@ export function Sidebar() {
                       end={item.path === "/"}
                       className={({ isActive }) =>
                         cn(
-                          "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                          "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                          "group relative flex items-center gap-3 rounded-md py-2 pl-4 pr-3 text-sm",
+                          "transition-[color,background-color] duration-[var(--dur-fast)] ease-[var(--ease-out-quart)]",
+                          // Active rail — anchors the eye without a heavy fill.
+                          "before:absolute before:left-0 before:top-1/2 before:h-4 before:w-[2px]",
+                          "before:-translate-y-1/2 before:rounded-full before:bg-sidebar-primary",
+                          "before:origin-center before:transition-transform before:duration-[var(--dur-base)]",
+                          "before:ease-[var(--ease-spring)]",
                           isActive
-                            ? "bg-sidebar-accent text-sidebar-primary font-medium"
-                            : "text-sidebar-foreground"
+                            ? "bg-sidebar-accent/70 text-sidebar-primary font-medium before:scale-y-100"
+                            : "text-sidebar-foreground before:scale-y-0 hover:bg-sidebar-accent/40 hover:text-sidebar-accent-foreground"
                         )
                       }
                       title={item.description}
                     >
-                      <span className="text-base" aria-hidden="true">
-                        {item.icon}
-                      </span>
-                      <span>{item.label}</span>
+                      {({ isActive }) => (
+                        <>
+                          <span
+                            className={cn(
+                              "text-base transition-opacity duration-[var(--dur-fast)]",
+                              isActive
+                                ? "opacity-100"
+                                : "opacity-55 group-hover:opacity-90"
+                            )}
+                            aria-hidden="true"
+                          >
+                            {item.icon}
+                          </span>
+                          <span>{item.label}</span>
+                        </>
+                      )}
                     </NavLink>
                   </li>
                 ))}
@@ -115,7 +145,7 @@ export function Sidebar() {
       <Separator />
       <div className="px-4 py-3 text-xs text-muted-foreground">
         <p className="font-heading">玄冥 | Ming Matrix</p>
-        <p className="mt-0.5">v0.1.0 &middot; Four Pillars of Destiny</p>
+        <p className="mt-0.5">v{APP_VERSION} &middot; Four Pillars of Destiny</p>
       </div>
     </aside>
   );

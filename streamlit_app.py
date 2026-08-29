@@ -264,9 +264,10 @@ PROVIDER_PRESETS = {
         "models": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
         "env_key": "OPENAI_API_KEY",
     },
+    # Anthropic 协议的 base_url 不带 /v1 —— SDK 自行拼接 /v1/messages。
     "Anthropic (兼容)": {
-        "base_url": "https://api.anthropic.com/v1",
-        "models": ["claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
+        "base_url": "https://api.anthropic.com",
+        "models": ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5-20251001"],
         "env_key": "ANTHROPIC_API_KEY",
     },
     "MiMo": {

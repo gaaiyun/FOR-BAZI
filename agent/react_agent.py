@@ -149,21 +149,24 @@ def run_react_loop_streaming(
 
     while step < max_steps:
         step += 1
-        content_parts = []
+        streamed_parts = []
+        accumulated = None
         tool_calls = []
 
         # 流式调用模型
         for item in call_api_streaming(client_info, model, working, tools=tools):
             if isinstance(item, tuple):
-                # 最终结果：(content, tool_calls)
-                content_parts.append(item[0])
-                tool_calls = item[1]
+                # 收尾元组：(完整累积内容, tool_calls)
+                accumulated, tool_calls = item[0], item[1]
             else:
                 # 实时内容片段
-                content_parts.append(item)
+                streamed_parts.append(item)
                 yield item
 
-        content = "".join(content_parts) if not tool_calls else (content_parts[0] if content_parts else "")
+        # 适配层收尾给的是**完整累积文本**，不是又一个增量块。
+        # 把它和各增量块一起 join 会得到「全文 + 全文」，正文整段重复；
+        # 而有工具调用时取首个增量块又会把内容截断。两者都以累积文本为准。
+        content = accumulated if accumulated is not None else "".join(streamed_parts)
 
         # 无工具调用 → 最终回答
         if not tool_calls:
@@ -181,12 +184,42 @@ def run_react_loop_streaming(
 
         for tc in tool_calls:
             name = tc["function"]["name"]
+            raw_args = tc["function"]["arguments"] or "{}"
             try:
-                args = json.loads(tc["function"]["arguments"] or "{}")
+                args = json.loads(raw_args)
             except json.JSONDecodeError:
                 args = {}
+
             yield f"[STATUS] 正在调用工具 {name}..."
-            result = dispatch_tool(name, args, bazi_data)
+            # 结构化的工具调用事件，供前端渲染调用卡片。
+            yield {
+                "type": "tool_call",
+                "id": tc["id"],
+                "name": name,
+                "arguments": raw_args,
+                "result": None,
+                "status": "calling",
+            }
+
+            # 单个工具出错不该让整条流断掉——把错误回传给模型，让它自己决定怎么办。
+            try:
+                result = dispatch_tool(name, args, bazi_data)
+                status = "done"
+            except Exception as exc:  # noqa: BLE001 - 要把任何工具异常转成可继续的状态
+                result = json.dumps(
+                    {"error": f"工具 {name} 执行失败：{exc}"}, ensure_ascii=False
+                )
+                status = "error"
+
+            yield {
+                "type": "tool_call",
+                "id": tc["id"],
+                "name": name,
+                "arguments": raw_args,
+                "result": result,
+                "status": status,
+            }
+
             working.append({
                 "tool_call_id": tc["id"],
                 "role": "tool",
