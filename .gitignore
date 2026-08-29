@@ -78,3 +78,8 @@ data/chroma_db/
 # 本地工具与崩溃转储
 *.stackdump
 .claude/
+
+# Worker
+worker/node_modules/
+worker/.wrangler/
+.wrangler/

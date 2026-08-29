@@ -1,0 +1,24 @@
+name = "for-bazi-ai-gateway"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+# Workers AI 绑定：网关用它调用我的免费额度，凭据不出 Cloudflare。
+[ai]
+binding = "AI"
+
+# 匿名限次计数。部署前先建：
+#   wrangler kv namespace create RATE_LIMIT_KV
+# 再把返回的 id 填到下面。
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "3b5ce3734a4041ee8f88d1725a93cb1e"
+
+[vars]
+# 匿名用户每 IP 每日免费次数
+ANON_DAILY_LIMIT = "5"
+DEFAULT_MODEL = "@cf/zai-org/glm-4.7-flash"
+# 部署 Pages 后改成实际域名，例如 "https://for-bazi.pages.dev"
+ALLOWED_ORIGINS = ""
+
+# 机密不写进本文件，用命令单独设置：
+#   wrangler secret put ACCESS_KEYS      # 逗号分隔的访问密钥

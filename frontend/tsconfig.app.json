@@ -24,5 +24,8 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  // 测试跑在 Node 里、要用 fs/path，不属于浏览器包；
+  // 它们由 tsconfig.test.json 单独类型检查。
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

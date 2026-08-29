@@ -12,6 +12,7 @@ import type {
   ApiError,
 } from "@/types/bazi";
 import { adaptChartResponse } from "@/lib/response-adapter";
+import { calculateChart } from "@/engine";
 
 /**
  * In Tauri production, the frontend is bundled as static files and has no
@@ -53,21 +54,20 @@ client.interceptors.response.use(
 
 /**
  * Calculate a full Bazi reading from birth information.
- * Combines birth_date + birth_time into datetime_str for the backend.
- * Calls POST /api/v1/chart with { datetime_str, gender }.
- * Uses adaptChartResponse() to transform the flat backend arrays
- * into the nested frontend BaziReading shape.
+ *
+ * Runs entirely in the browser. Charting is deterministic and needs no
+ * credentials, so there is no reason to round-trip it through a server —
+ * this is what lets the app deploy to Cloudflare Pages as a static site
+ * with no Python backend. The TypeScript engine is verified field-for-field
+ * against the Python one by `src/engine/parity.test.ts`.
  */
 export async function calculateBazi(input: BaziInput): Promise<BaziReading> {
   const datetimeStr = `${input.birth_date} ${input.birth_time}`;
-  // Backend expects exactly "乾造 (Male)" or "坤造 (Female)".
+  // Engine expects exactly "乾造 (Male)" or "坤造 (Female)".
   const genderLabel = input.gender === "male" ? "乾造 (Male)" : "坤造 (Female)";
-  const { data } = await client.post("/v1/chart", {
-    datetime_str: datetimeStr,
-    gender: genderLabel,
-  });
-  // Adapt flat backend response → nested frontend BaziReading.
-  return adaptChartResponse(data);
+  const data = calculateChart(datetimeStr, genderLabel);
+  // Adapt flat engine output → nested frontend BaziReading.
+  return adaptChartResponse(data as never);
 }
 
 // ── AI Chat / Analysis ──────────────────────────────────────────────

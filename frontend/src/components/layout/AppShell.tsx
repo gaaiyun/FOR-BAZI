@@ -25,7 +25,7 @@ export function AppShell() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground">
-              命理系统 v0.1.0
+              命理系统 v{__APP_VERSION__}
             </span>
           </div>
         </header>
