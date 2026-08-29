@@ -6,8 +6,7 @@
  */
 
 import { useState, useMemo } from "react";
-import ReactECharts from "echarts-for-react";
-import type { EChartsOption } from "echarts";
+import DayunTimeline from "@/components/bazi/DayunTimeline";
 import { useBaziStore } from "@/stores/useBaziStore";
 import { getCharColor } from "@/lib/wuxing-colors";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -76,98 +75,6 @@ export default function LuckPillars() {
       }));
   }, [reading, selectedDayunIdx, dayunEntries]);
 
-  /* ── ECharts timeline option ──────────────────────────────────── */
-  const timelineOption = useMemo<EChartsOption>(() => {
-    if (dayunEntries.length === 0) return {};
-
-    const categories = dayunEntries.map((d) => d.ganzhi);
-    const currentGradient = {
-      type: "linear" as const,
-      x: 0, y: 0, x2: 1, y2: 0,
-      colorStops: [
-        { offset: 0, color: "#e94560" },
-        { offset: 1, color: "#d4af37" },
-      ],
-    };
-    const barData = dayunEntries.map((d) => ({
-      value: d.endYear - d.startYear + 1,
-      itemStyle: {
-        color: d.isCurrent ? currentGradient : d.color,
-        borderRadius: [4, 4, 4, 4],
-      },
-    }));
-
-    return {
-      backgroundColor: "transparent",
-      tooltip: {
-        trigger: "axis",
-        axisPointer: { type: "shadow" },
-        backgroundColor: "#161b22",
-        borderColor: "#30363d",
-        textStyle: { color: "#e6edf3" },
-        formatter: (params: unknown) => {
-          const item = Array.isArray(params) ? params[0] : null;
-          if (!item || typeof item !== "object") return "";
-          const p = item as { dataIndex: number };
-          const d = dayunEntries[p.dataIndex];
-          if (!d) return "";
-          return [
-            `<strong>${d.ganzhi}</strong>`,
-            `岁数: ${d.startAge} - ${d.endAge}`,
-            `年份: ${d.startYear} - ${d.endYear}`,
-            d.isCurrent ? '<span style="color:#e94560">当前大运</span>' : "",
-          ]
-            .filter(Boolean)
-            .join("<br/>");
-        },
-      },
-      grid: { left: 60, right: 30, top: 30, bottom: 40 },
-      xAxis: {
-        type: "value",
-        name: "年数",
-        nameTextStyle: { color: "#8b949e" },
-        axisLabel: { color: "#8b949e" },
-        splitLine: { lineStyle: { color: "#30363d", type: "dashed" } },
-      },
-      yAxis: {
-        type: "category",
-        data: categories,
-        axisLabel: {
-          color: "#e6edf3",
-          fontSize: 13,
-          fontWeight: 600,
-        },
-        axisLine: { show: false },
-        axisTick: { show: false },
-      },
-      series: [
-        {
-          type: "bar",
-          data: barData,
-          barWidth: 24,
-          label: {
-            show: true,
-            position: "right",
-            color: "#8b949e",
-            fontSize: 11,
-            formatter: (params: unknown) => {
-              const p = params as { dataIndex: number };
-              const d = dayunEntries[p.dataIndex];
-              return d ? `${d.startYear}-${d.endYear}` : "";
-            },
-          },
-        },
-      ],
-    };
-  }, [dayunEntries]);
-
-  /* ── Handle click on timeline bar ─────────────────────────────── */
-  const onChartClick = (params: { dataIndex?: number }) => {
-    if (typeof params.dataIndex === "number") {
-      setSelectedDayunIdx(params.dataIndex);
-    }
-  };
-
   /* ── No data state ────────────────────────────────────────────── */
   if (!reading) {
     return (
@@ -212,26 +119,19 @@ export default function LuckPillars() {
 
         {/* ── Timeline View ─────────────────────────────────────── */}
         <TabsContent value="timeline">
-          <Card className="bg-[#161b22]/60 border-[#30363d]">
-            <CardHeader>
-              <CardTitle className="text-foreground">大运时间线</CardTitle>
-              <CardDescription>
-                点击柱状条可查看对应大运的流年详情
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {dayunEntries.length > 0 ? (
-                <ReactECharts
-                  option={timelineOption}
-                  style={{ height: Math.max(300, dayunEntries.length * 48 + 60) }}
-                  onEvents={{ click: onChartClick }}
-                  opts={{ renderer: "canvas" }}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">暂无大运数据</p>
-              )}
-            </CardContent>
-          </Card>
+          <section className="surface-panel rounded-xl p-6">
+            <h2 className="rule-accent font-heading text-base font-semibold text-foreground">
+              大运时间线
+            </h2>
+            <p className="mt-1 mb-5 text-xs text-muted-foreground">
+              段宽按实际年数比例排布，点击可查看该步的流年详情
+            </p>
+            <DayunTimeline
+              dayun={reading?.dayun ?? []}
+              selectedIndex={selectedDayunIdx ?? undefined}
+              onSelect={setSelectedDayunIdx}
+            />
+          </section>
         </TabsContent>
 
         {/* ── List View ─────────────────────────────────────────── */}

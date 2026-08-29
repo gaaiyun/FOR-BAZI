@@ -176,7 +176,7 @@ export default function ChartVisualization() {
             </CardHeader>
             <CardContent>
               {dayunEntries.length > 0 ? (
-                <DayunTimeline dayun={dayunEntries} height={320} />
+                <DayunTimeline dayun={dayunEntries} />
               ) : (
                 <p className="py-8 text-center text-sm text-[#6e7681]">
                   暂无大运数据
@@ -340,27 +340,38 @@ export default function ChartVisualization() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {reading.all_shensha.map((ss, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start gap-3 rounded-lg border border-[#30363d]/50 bg-[#0d1117] px-3 py-2"
-                    >
-                      <Badge
-                        variant="secondary"
-                        className="shrink-0 bg-[#50c878]/15 text-[#50c878] border-[#50c878]/30 text-xs"
-                      >
-                        {ss.name}
-                      </Badge>
-                      <span className="text-xs text-[#6e7681]">
-                        {ss.pillar}
-                      </span>
-                      <span className="flex-1 text-xs text-[#8b949e]">
-                        {ss.description}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                {/* 只渲染真正有神煞的柱：空柱此前也画成带绿点的整行，
+                    看起来像有内容，实际是空的。 */}
+                {(() => {
+                  const hits = reading.all_shensha.filter((s) => s.name?.trim());
+                  if (!hits.length) {
+                    return (
+                      <p className="py-6 text-center text-sm text-muted-foreground">
+                        此命盘四柱未见收录的神煞
+                      </p>
+                    );
+                  }
+                  return (
+                    <ul className="stagger space-y-2">
+                      {hits.map((ss, i) => (
+                        <li
+                          key={i}
+                          className="surface-inset flex items-baseline gap-3 rounded-lg px-3 py-2.5"
+                        >
+                          <span className="shrink-0 rounded-full border border-jade/25 bg-jade/10 px-2 py-0.5 text-[11px] font-medium text-jade">
+                            {ss.name}
+                          </span>
+                          <span className="shrink-0 text-[11px] text-muted-foreground">
+                            {ss.pillar}
+                          </span>
+                          <span className="flex-1 text-xs leading-relaxed text-foreground/75">
+                            {ss.description}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                })()}
               </CardContent>
             </Card>
           )}

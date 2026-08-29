@@ -6,6 +6,7 @@
 
 import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
+import { withTheme } from "@/lib/chart-theme";
 import { ELEMENT_COLORS } from "@/lib/wuxing-colors";
 import type { WuxingPower } from "@/types/bazi";
 
@@ -100,7 +101,7 @@ export default function WuxingBar({ wuxingPower, height = 300 }: WuxingBarProps)
 
   return (
     <ReactECharts
-      option={option}
+      option={withTheme(option)}
       style={{ height, width: "100%" }}
       opts={{ renderer: "canvas" }}
       notMerge
