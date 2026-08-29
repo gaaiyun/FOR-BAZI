@@ -3,6 +3,8 @@
  * These types mirror the backend API response shapes.
  */
 
+import type { BaziChart as EngineChart } from "@/engine/bazi";
+
 /** A single pillar in the Bazi chart (Year, Month, Day, or Hour). */
 export interface Pillar {
   /** Heavenly Stem character (天干), e.g. "甲" */
@@ -119,6 +121,11 @@ export interface BaziReading {
   gender?: string;
 
   // ── Extended fields from POST /api/v1/chart ──────────────────
+  /**
+   * 引擎产出的扁平命盘原件。UI 用的是上面的嵌套结构，但 Agent 工具
+   * （格局、五行力量、古籍查询）需要引擎原始格式，带着走可免去反向转换。
+   */
+  engine_chart?: EngineChart;
   /** Per-pillar annotations keyed by "year" | "month" | "day" | "hour". */
   pillar_annotations?: Record<string, PillarAnnotations>;
   /** Wuxing power scores for radar/bar charts. */

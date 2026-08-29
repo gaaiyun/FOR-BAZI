@@ -21,7 +21,8 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@data/*": ["../data/classical_texts/*"]
     }
   },
   // 测试跑在 Node 里、要用 fs/path，不属于浏览器包；

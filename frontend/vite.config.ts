@@ -20,6 +20,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // 古籍 JSON 与后端共用同一份，避免复制导致两边漂移
+      '@data': path.resolve(__dirname, '../data/classical_texts'),
     },
   },
   server: {

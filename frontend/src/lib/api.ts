@@ -13,6 +13,7 @@ import type {
 } from "@/types/bazi";
 import { adaptChartResponse } from "@/lib/response-adapter";
 import { calculateChart } from "@/engine";
+import { runReactLoop } from "@/lib/react-agent";
 
 /**
  * In Tauri production, the frontend is bundled as static files and has no
@@ -23,9 +24,6 @@ const isTauri = "__TAURI_INTERNALS__" in window;
 
 const API_BASE = isTauri ? "http://127.0.0.1:8000/api" : "/api";
 const HEALTH_BASE = isTauri ? "http://127.0.0.1:8000/health" : "/health";
-const CHAT_STREAM_URL = isTauri
-  ? "http://127.0.0.1:8000/api/v1/chat/stream"
-  : "/api/v1/chat/stream";
 
 const client: AxiosInstance = axios.create({
   baseURL: API_BASE,
@@ -66,47 +64,74 @@ export async function calculateBazi(input: BaziInput): Promise<BaziReading> {
   // Engine expects exactly "乾造 (Male)" or "坤造 (Female)".
   const genderLabel = input.gender === "male" ? "乾造 (Male)" : "坤造 (Female)";
   const data = calculateChart(datetimeStr, genderLabel);
-  // Adapt flat engine output → nested frontend BaziReading.
-  return adaptChartResponse(data as never);
+  // Adapt flat engine output → nested frontend BaziReading，
+  // 同时把引擎原件带上，供 Agent 工具直接使用。
+  return { ...adaptChartResponse(data as never), engine_chart: data.chart };
 }
 
 // ── AI Chat / Analysis ──────────────────────────────────────────────
 
 /**
- * Map frontend AIProviderId values to backend-recognized provider names.
- *
- * The backend api_adapter.py uses these names to select the correct SDK:
- *   - Names in ANTHROPIC_PROVIDERS → Anthropic SDK
- *   - Everything else → OpenAI SDK (works for OpenAI-compatible APIs)
- *
- * Frontend IDs like "alibaba", "deepseek" are OpenAI-compatible, so they
- * map to "OpenAI". "mimo" maps to "MiMo" for the Anthropic code path.
- * "anthropic" maps to a recognized Anthropic provider name.
+ * 各服务商的 OpenAI 兼容 base URL。
+ * 用户自带 key 时，请求由 Worker 网关代转到这里——既用对方自己的额度，
+ * 也顺带解决浏览器直连第三方 API 的 CORS 问题。
  */
-const PROVIDER_NAME_MAP: Record<string, string> = {
-  cloudflare: "Cloudflare",
-  alibaba: "OpenAI",
-  openai: "OpenAI",
-  anthropic: "Anthropic (兼容)",
-  mimo: "MiMo",
-  deepseek: "OpenAI",
-  custom: "OpenAI",
+const PROVIDER_BASE_URLS: Record<string, string> = {
+  openai: "https://api.openai.com/v1",
+  anthropic: "https://api.anthropic.com/v1",
+  alibaba: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  deepseek: "https://api.deepseek.com/v1",
+  mimo: "https://token-plan-cn.xiaomimimo.com/v1",
 };
 
+/** Worker AI 网关地址。构建时可用 VITE_AI_GATEWAY 覆盖。 */
+export const AI_GATEWAY =
+  (import.meta.env.VITE_AI_GATEWAY as string | undefined) ??
+  "https://for-bazi-ai-gateway.gaaiyun-risk-selfcheck.workers.dev";
+
+/** 本地保存的访问密钥（持有者不受匿名限次约束）。 */
+const ACCESS_KEY_STORAGE = "bazi-access-key";
+
+export function getAccessKey(): string {
+  try {
+    return localStorage.getItem(ACCESS_KEY_STORAGE) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function setAccessKey(v: string): void {
+  try {
+    if (v) localStorage.setItem(ACCESS_KEY_STORAGE, v);
+    else localStorage.removeItem(ACCESS_KEY_STORAGE);
+  } catch {
+    /* 隐私模式下 localStorage 可能不可用，忽略即可 */
+  }
+}
+
+/** 查询今日剩余免费次数，供设置页展示。 */
+export async function fetchQuota(): Promise<{
+  mode: string;
+  unlimited?: boolean;
+  limit?: number;
+  used?: number;
+  remaining?: number;
+}> {
+  const headers: Record<string, string> = {};
+  const key = getAccessKey();
+  if (key) headers["X-Access-Key"] = key;
+  const res = await fetch(`${AI_GATEWAY}/api/quota`, { headers });
+  return res.json();
+}
+
 /**
- * Stream a chat response via SSE (Server-Sent Events) using fetch + ReadableStream.
- * The backend exposes POST /api/v1/chat/stream which returns an SSE stream.
+ * 跑一轮 AI 对话。
  *
- * Transforms the frontend ChatStreamRequest into the backend ChatRequest shape
- * (separate provider, api_key, base_url, model fields).
+ * ReAct 循环与全部工具都在浏览器本地执行——排盘、五行、格局、古籍检索
+ * 都是本地计算和本地数据，没必要绕服务器；只有模型补全走 Worker 网关，
+ * 由它统一处理访问密钥、匿名限次和自带 key 的转发。
  *
- * @param params       - Chat request body (message, context, provider, history).
- * @param onToken      - Called for each streamed text token.
- * @param onStatus     - Called when the server sends a status update.
- * @param onToolCall   - Called when a tool call event is received.
- * @param onDone       - Called when the stream completes successfully.
- * @param onError      - Called when an error occurs.
- * @param signal       - Optional AbortSignal to cancel the request.
+ * 事件回调签名与原来的 SSE 版本保持一致，上层组件无需改动。
  */
 export async function chatStream(
   params: ChatStreamRequest,
@@ -123,157 +148,53 @@ export async function chatStream(
   onError: (error: string) => void,
   signal?: AbortSignal
 ): Promise<void> {
-  // Transform frontend ChatStreamRequest → backend ChatRequest shape.
-  // Map the frontend provider ID to a backend-recognized name.
-  const mappedProvider =
-    PROVIDER_NAME_MAP[params.provider.provider] ?? params.provider.provider;
+  const cfg = params.provider;
 
-  const backendBody = {
-    message: params.message,
-    provider: mappedProvider,
-    api_key: params.provider.api_key,
-    base_url: params.provider.base_url ?? "https://api.openai.com/v1",
-    model: params.provider.model,
-    chart_data: params.bazi_context ?? null,
-    history: params.history.map((m) => ({ role: m.role, content: m.content })),
-    max_steps: 8,
+  // 自带 key：走对方服务商，不消耗默认额度。
+  const isByo = cfg.provider !== "cloudflare" && Boolean(cfg.api_key);
+  const baseUrl = cfg.base_url || PROVIDER_BASE_URLS[cfg.provider] || "";
+
+  const gateway = {
+    endpoint: AI_GATEWAY,
+    accessKey: getAccessKey() || undefined,
+    providerKey: isByo ? cfg.api_key : undefined,
+    providerBaseUrl: isByo ? baseUrl : undefined,
+    model: cfg.model || undefined,
   };
 
-  const maxRetries = 2;
-  let lastError: Error | null = null;
+  try {
+    const stream = runReactLoop({
+      message: params.message,
+      chart: params.bazi_context?.engine_chart ?? null,
+      history: params.history.map((m) => ({ role: m.role, content: m.content })),
+      gateway,
+      signal,
+    });
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await fetch(CHAT_STREAM_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(backendBody),
-        signal,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => response.statusText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      if (!response.body) {
-        throw new Error("Response body is null – streaming not supported.");
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        // Normalize CRLF to LF, then split on double newline.
-        buffer = buffer.replace(/\r\n/g, "\n");
-        const parts = buffer.split("\n\n");
-        // Keep the last incomplete chunk in the buffer.
-        buffer = parts.pop() ?? "";
-
-        for (const part of parts) {
-          if (!part.trim()) continue;
-
-          let eventType = "message";
-          let eventData = "";
-
-          for (const line of part.split("\n")) {
-            if (line.startsWith("event: ")) {
-              eventType = line.slice(7).trim();
-            } else if (line.startsWith("data: ")) {
-              eventData += line.slice(6);
-            } else if (line.startsWith("data:")) {
-              // SSE spec allows no space after colon.
-              eventData += line.slice(5);
-            }
-          }
-
-          if (!eventData) continue;
-
-          switch (eventType) {
-            case "token":
-              try {
-                const tokenParsed = JSON.parse(eventData);
-                onToken(typeof tokenParsed === "string" ? tokenParsed : (tokenParsed.content ?? eventData));
-              } catch {
-                onToken(eventData);
-              }
-              break;
-
-            case "status":
-              try {
-                const statusParsed = JSON.parse(eventData);
-                onStatus(typeof statusParsed === "string" ? statusParsed : (statusParsed.message ?? eventData));
-              } catch {
-                onStatus(eventData);
-              }
-              break;
-
-            case "tool_call":
-              try {
-                onToolCall(JSON.parse(eventData));
-              } catch {
-                onToolCall({
-                  id: `tc_${Date.now()}`,
-                  name: "unknown",
-                  arguments: eventData,
-                  result: null,
-                  status: "calling",
-                });
-              }
-              break;
-
-            case "done":
-              try {
-                onDone(JSON.parse(eventData));
-              } catch {
-                onDone({});
-              }
-              break;
-
-            case "error":
-              onError(
-                eventData.startsWith('"') && eventData.endsWith('"')
-                  ? JSON.parse(eventData)
-                  : eventData
-              );
-              return; // Do not retry on application-level errors.
-
-            default:
-              // Unknown event type – ignore gracefully.
-              break;
-          }
-        }
-      }
-
-      // Stream finished successfully.
-      return;
-    } catch (err: unknown) {
-      if (signal?.aborted) return; // User cancelled – do not retry.
-
-      lastError = err instanceof Error ? err : new Error(String(err));
-
-      // Do not retry on 4xx client errors.
-      if (lastError.message.startsWith("HTTP 4")) {
-        onError(lastError.message);
-        return;
-      }
-
-      if (attempt < maxRetries) {
-        // Exponential back-off: 1s, 2s.
-        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-        continue;
+    for await (const ev of stream) {
+      if (signal?.aborted) return;
+      switch (ev.type) {
+        case "token":
+          onToken(String(ev.payload.content ?? ""));
+          break;
+        case "status":
+          onStatus(String(ev.payload.message ?? ""));
+          break;
+        case "tool_call":
+          onToolCall(ev.payload as never);
+          break;
+        case "done":
+          onDone(ev.payload);
+          break;
+        case "error":
+          onError(String(ev.payload.message ?? "未知错误"));
+          return;
       }
     }
+  } catch (err) {
+    if (signal?.aborted) return;
+    onError(err instanceof Error ? err.message : String(err));
   }
-
-  // All retries exhausted.
-  onError(lastError?.message ?? "Unknown streaming error");
 }
 
 // ── Classical Texts Search ─────────────────────────────────────────
