@@ -84,10 +84,12 @@ const PROVIDER_BASE_URLS: Record<string, string> = {
   mimo: "https://token-plan-cn.xiaomimimo.com/v1",
 };
 
-/** Worker AI 网关地址。构建时可用 VITE_AI_GATEWAY 覆盖。 */
+/**
+ * AI 网关地址。默认同源（Pages Function 挂在 /api/*），
+ * 因此不需要跨域配置；本地开发时用 VITE_AI_GATEWAY 指向别处。
+ */
 export const AI_GATEWAY =
-  (import.meta.env.VITE_AI_GATEWAY as string | undefined) ??
-  "https://for-bazi-ai-gateway.gaaiyun-risk-selfcheck.workers.dev";
+  (import.meta.env.VITE_AI_GATEWAY as string | undefined) ?? "";
 
 /** 本地保存的访问密钥（持有者不受匿名限次约束）。 */
 const ACCESS_KEY_STORAGE = "bazi-access-key";

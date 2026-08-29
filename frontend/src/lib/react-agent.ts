@@ -70,7 +70,8 @@ async function callGateway(
     headers["X-Access-Key"] = cfg.accessKey;
   }
 
-  const res = await fetch(`${cfg.endpoint.replace(/\/+$/, "")}/api/chat`, {
+  const base = cfg.endpoint.replace(/\/+$/, "");
+  const res = await fetch(`${base}/api/chat`, {
     method: "POST",
     headers,
     signal,

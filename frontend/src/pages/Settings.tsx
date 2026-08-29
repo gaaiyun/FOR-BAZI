@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import AccessKeyCard from "@/components/settings/AccessKeyCard";
 
 /** Provider presets: label, default model, default base URL. */
 const PROVIDER_PRESETS: Record<
@@ -128,9 +129,11 @@ export default function Settings() {
           设置 · Settings
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Configure AI provider, API keys, and application preferences.
+          配置 AI 服务商、访问密钥与外观偏好
         </p>
       </div>
+
+      <AccessKeyCard />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* ── AI Provider Configuration ─────────────────────────── */}

@@ -41,7 +41,7 @@ export default function FourPillarGrid({
   };
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="stagger grid grid-cols-2 gap-3 sm:grid-cols-4">
       {PILLAR_KEYS.map(({ key, label, sublabel }) => {
         const p = pillars[key];
         const ann = pillar_annotations?.[key];
@@ -61,6 +61,7 @@ export default function FourPillarGrid({
             dishi={ann?.dishi}
             xunkong={ann?.xunkong}
             isProfessional={isProfessional}
+            isDayPillar={key === "day"}
           />
         );
       })}

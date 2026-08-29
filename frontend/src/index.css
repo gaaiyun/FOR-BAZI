@@ -158,9 +158,81 @@
     font-family: 'Noto Serif SC', 'Geist Variable', serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+
+    /*
+      纯平的 #0d1117 会让所有卡片都像贴纸。这里叠两层极淡的径向光晕
+      （金／靛），给页面一个隐约的光源方向，卡片的边框和阴影才站得住。
+      固定不随滚动移动，避免视觉噪声。
+    */
+    background-image:
+      radial-gradient(120ch 60ch at 15% -10%, rgb(212 175 55 / 0.055), transparent 60%),
+      radial-gradient(100ch 50ch at 95% 0%, rgb(74 144 217 / 0.045), transparent 55%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
   }
   html {
     @apply font-sans;
+  }
+
+  /* 数字与干支用等宽对齐，表格里不会跳动 */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ---------------------------------------------------
+   表面层级
+
+   卡片不再各自硬编码颜色。三档表面对应三种语义：
+   panel  —— 常规内容块
+   raised —— 需要被注意的主对象（如四柱卡）
+   inset  —— 嵌在其他表面里的次级块
+   --------------------------------------------------- */
+@layer components {
+  .surface-panel {
+    background: color-mix(in oklab, var(--card) 92%, transparent);
+    border: 1px solid var(--border);
+    box-shadow: var(--elev-1);
+    backdrop-filter: blur(8px);
+  }
+
+  .surface-raised {
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.025), transparent 40%),
+      color-mix(in oklab, var(--card) 96%, transparent);
+    border: 1px solid var(--border);
+    box-shadow: var(--elev-2);
+    backdrop-filter: blur(10px);
+  }
+
+  .surface-inset {
+    background: rgb(0 0 0 / 0.22);
+    border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.25);
+  }
+
+  /* 可交互卡片：hover 时抬起并让金色描边浮现 */
+  .card-interactive {
+    transition:
+      transform var(--dur-base) var(--ease-out-quart),
+      box-shadow var(--dur-base) var(--ease-out-quart),
+      border-color var(--dur-base) var(--ease-out-quart);
+  }
+  .card-interactive:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+    box-shadow: var(--elev-3);
+  }
+
+  /* 章节标题上方的细金线，用来分段而不靠粗分隔线 */
+  .rule-accent::before {
+    content: "";
+    display: block;
+    width: 2rem;
+    height: 2px;
+    margin-bottom: 0.75rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--primary), transparent);
   }
 }
 

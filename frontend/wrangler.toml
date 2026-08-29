@@ -1,0 +1,17 @@
+name = "for-bazi"
+compatibility_date = "2026-08-01"
+pages_build_output_dir = "dist"
+
+# 网关与站点同源部署，请求走 /api/*，因此不需要跨域配置。
+[ai]
+binding = "AI"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "3b5ce3734a4041ee8f88d1725a93cb1e"
+
+[vars]
+ANON_DAILY_LIMIT = "5"
+DEFAULT_MODEL = "@cf/zai-org/glm-4.7-flash"
+
+# 机密单独设置：wrangler pages secret put ACCESS_KEYS --project-name=for-bazi
