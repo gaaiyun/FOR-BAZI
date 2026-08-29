@@ -6,17 +6,12 @@
  */
 
 import { useState, useMemo } from "react";
+import { PageHeader, EmptyState } from "@/components/layout/Page";
 import DayunTimeline from "@/components/bazi/DayunTimeline";
 import { useBaziStore } from "@/stores/useBaziStore";
 import { getCharColor } from "@/lib/wuxing-colors";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 /** Current year for highlighting. */
@@ -79,17 +74,8 @@ export default function LuckPillars() {
   if (!reading) {
     return (
       <div className="animate-fade-in">
-        <h1 className="font-heading text-2xl font-semibold text-gold">
-          大运 · Luck Pillars
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          请先在排盘页面输入出生信息，再查看大运。
-        </p>
-        <div className="mt-8 rounded-lg border border-[#30363d] bg-[#161b22]/60 p-6">
-          <p className="text-sm text-muted-foreground">
-            暂无命盘数据。请先进行排盘计算。
-          </p>
-        </div>
+        <PageHeader title="大运" en="Luck Pillars" description="十年一步的运程轨迹与逐年流年" />
+        <EmptyState />
       </div>
     );
   }
@@ -101,14 +87,7 @@ export default function LuckPillars() {
 
   return (
     <div className="animate-fade-in space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-gold">
-          大运 · Luck Pillars
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Ten-year luck pillars and their influence on destiny.
-        </p>
-      </div>
+      <PageHeader title="大运" en="Luck Pillars" description="十年一步的运程轨迹与逐年流年" />
 
       {/* ── Tabs: Timeline vs List ──────────────────────────────── */}
       <Tabs defaultValue="timeline">
@@ -142,8 +121,8 @@ export default function LuckPillars() {
                 key={d.idx}
                 className={`cursor-pointer transition-colors ${
                   d.isCurrent
-                    ? "border-[#e94560]/60 bg-[#e94560]/10"
-                    : "bg-[#161b22]/60 border-[#30363d] hover:border-[#d4af37]/40"
+                    ? "border-crimson/60 bg-crimson/10"
+                    : "bg-card/60 border-border hover:border-gold/40"
                 }`}
                 onClick={() => setSelectedDayunIdx(d.idx)}
               >
@@ -178,7 +157,7 @@ export default function LuckPillars() {
 
       {/* ── Liunian (流年) breakdown for selected dayun ─────────── */}
       {activeDayun && (
-        <Card className="bg-[#161b22]/60 border-[#30363d]">
+        <Card className="bg-card/60 border-border">
           <CardHeader>
             <CardTitle className="text-foreground">
               流年详情 — {activeDayun.ganzhi} 大运
@@ -198,13 +177,13 @@ export default function LuckPillars() {
                     key={ln.year}
                     className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${
                       ln.isCurrent
-                        ? "border-[#e94560]/60 bg-[#e94560]/10"
-                        : "border-[#30363d] bg-[#0d1117]/60"
+                        ? "border-crimson/60 bg-crimson/10"
+                        : "border-border bg-background/60"
                     }`}
                   >
                     <span
                       className={`text-sm font-medium ${
-                        ln.isCurrent ? "text-[#e94560]" : "text-muted-foreground"
+                        ln.isCurrent ? "text-crimson" : "text-muted-foreground"
                       }`}
                     >
                       {ln.year}

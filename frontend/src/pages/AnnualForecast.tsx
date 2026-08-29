@@ -5,16 +5,11 @@
  */
 
 import { useMemo } from "react";
+import { PageHeader, Section, EmptyState } from "@/components/layout/Page";
 import { useBaziStore } from "@/stores/useBaziStore";
 import { getCharColor } from "@/lib/wuxing-colors";
 import type { BaziChart } from "@/types/bazi";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 /** Current year. */
@@ -128,35 +123,19 @@ export default function AnnualForecast() {
   if (!reading) {
     return (
       <div className="animate-fade-in">
-        <h1 className="font-heading text-2xl font-semibold text-gold">
-          流年 · Annual Forecast
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          请先在排盘页面输入出生信息，再查看流年运势。
-        </p>
-        <div className="mt-8 rounded-lg border border-[#30363d] bg-[#161b22]/60 p-6">
-          <p className="text-sm text-muted-foreground">
-            暂无命盘数据。请先进行排盘计算。
-          </p>
-        </div>
+        <PageHeader title="流年" en="Annual Forecast" description="逐年干支与当年运势，可切换大运区间" />
+        <EmptyState />
       </div>
     );
   }
 
   return (
     <div className="animate-fade-in space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-gold">
-          流年 · Annual Forecast
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Year-by-year analysis of annual pillar interactions.
-        </p>
-      </div>
+      <PageHeader title="流年" en="Annual Forecast" description="逐年干支与当年运势，可切换大运区间" />
 
       {/* ── Current Year Highlight ──────────────────────────────── */}
       {currentAnnual && (
-        <Card className="bg-[#161b22]/60 border-[#d4af37]/40">
+        <Card className="bg-card/60 border-gold/40">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -196,7 +175,7 @@ export default function AnnualForecast() {
                     {interactions.map((text, i) => (
                       <p
                         key={i}
-                        className="text-sm text-muted-foreground pl-3 border-l-2 border-[#d4af37]/40"
+                        className="text-sm text-muted-foreground pl-3 border-l-2 border-gold/40"
                       >
                         {text}
                       </p>
@@ -215,7 +194,7 @@ export default function AnnualForecast() {
                     {predictions.map((text, i) => (
                       <p
                         key={i}
-                        className="text-sm text-muted-foreground pl-3 border-l-2 border-[#50c878]/40"
+                        className="text-sm text-muted-foreground pl-3 border-l-2 border-jade/40"
                       >
                         {text}
                       </p>
@@ -229,14 +208,10 @@ export default function AnnualForecast() {
       )}
 
       {/* ── Nearby Years Grid ───────────────────────────────────── */}
-      <Card className="bg-[#161b22]/60 border-[#30363d]">
-        <CardHeader>
-          <CardTitle className="text-foreground">近十年流年</CardTitle>
-          <CardDescription>
-            {CURRENT_YEAR - 5} 至 {CURRENT_YEAR + 5} 年流年干支一览
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Section
+        title="近十年流年"
+        description={`${CURRENT_YEAR - 5} 至 ${CURRENT_YEAR + 5} 年流年干支一览`}
+      >
           {nearbyYears.length > 0 ? (
             <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {nearbyYears.map((ny) => (
@@ -244,13 +219,13 @@ export default function AnnualForecast() {
                   key={ny.year}
                   className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${
                     ny.isCurrent
-                      ? "border-[#d4af37]/60 bg-[#d4af37]/10"
-                      : "border-[#30363d] bg-[#0d1117]/60"
+                      ? "border-gold/60 bg-gold/10"
+                      : "border-border bg-background/60"
                   }`}
                 >
                   <span
                     className={`text-sm font-medium min-w-[3.5rem] ${
-                      ny.isCurrent ? "text-[#d4af37]" : "text-muted-foreground"
+                      ny.isCurrent ? "text-gold" : "text-muted-foreground"
                     }`}
                   >
                     {ny.year}
@@ -273,22 +248,15 @@ export default function AnnualForecast() {
           ) : (
             <p className="text-sm text-muted-foreground">暂无流年数据</p>
           )}
-        </CardContent>
-      </Card>
+        </Section>
 
       {/* ── Summary from reading ────────────────────────────────── */}
       {reading.summary && (
-        <Card className="bg-[#161b22]/60 border-[#30363d]">
-          <CardHeader>
-            <CardTitle className="text-foreground">命理总论</CardTitle>
-            <CardDescription>综合命局分析摘要</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Section title="命理总论" description="综合命局分析摘要">
             <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
               {reading.summary}
             </p>
-          </CardContent>
-        </Card>
+          </Section>
       )}
     </div>
   );

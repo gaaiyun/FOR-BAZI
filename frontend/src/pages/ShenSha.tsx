@@ -5,15 +5,10 @@
  */
 
 import { useMemo } from "react";
+import { PageHeader, Section, EmptyState } from "@/components/layout/Page";
 import { useBaziStore } from "@/stores/useBaziStore";
 import { getElementColor } from "@/lib/wuxing-colors";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 /** Descriptions for common Shen Sha stars. */
@@ -132,17 +127,8 @@ export default function ShenSha() {
   if (!reading) {
     return (
       <div className="animate-fade-in">
-        <h1 className="font-heading text-2xl font-semibold text-gold">
-          神煞 · Shen Sha Stars
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          请先在排盘页面输入出生信息，再查看神煞。
-        </p>
-        <div className="mt-8 rounded-lg border border-[#30363d] bg-[#161b22]/60 p-6">
-          <p className="text-sm text-muted-foreground">
-            暂无命盘数据。请先进行排盘计算。
-          </p>
-        </div>
+        <PageHeader title="神煞" en="Shen Sha" description="以日干、日支、年支为太极点查得的神煞" />
+        <EmptyState />
       </div>
     );
   }
@@ -157,24 +143,10 @@ export default function ShenSha() {
 
   return (
     <div className="animate-fade-in space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-gold">
-          神煞 · Shen Sha Stars
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Special stars and spiritual indicators in the Bazi chart.
-        </p>
-      </div>
+      <PageHeader title="神煞" en="Shen Sha" description="以日干、日支、年支为太极点查得的神煞" />
 
       {/* Summary */}
-      <Card className="bg-[#161b22]/60 border-[#30363d]">
-        <CardHeader>
-          <CardTitle className="text-foreground">神煞概览</CardTitle>
-          <CardDescription>
-            命盘中共有 {totalCount} 个神煞
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Section title="神煞概览" description={`命盘中共有 ${totalCount} 个神煞`}>
           {totalCount > 0 ? (
             <div className="flex flex-wrap gap-2">
               {Object.values(shenshaByGroup)
@@ -194,8 +166,7 @@ export default function ShenSha() {
               该命盘未检测到神煞信息。
             </p>
           )}
-        </CardContent>
-      </Card>
+        </Section>
 
       {/* ── Grouped by pillar ───────────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -207,7 +178,7 @@ export default function ShenSha() {
           return (
             <Card
               key={group.key}
-              className="bg-[#161b22]/60 border-[#30363d]"
+              className="bg-card/60 border-border"
             >
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -233,7 +204,7 @@ export default function ShenSha() {
                     {items.map((ss, i) => (
                       <div
                         key={`${ss.name}-${i}`}
-                        className="rounded-lg border border-[#30363d] bg-[#0d1117]/60 p-3"
+                        className="rounded-lg border border-border bg-background/60 p-3"
                       >
                         <div className="flex items-center gap-2 mb-1">
                           <Badge variant="default" className="text-xs">

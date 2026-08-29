@@ -52,8 +52,8 @@ export function ToolCallStatus({ toolCall, className }: ToolCallStatusProps) {
   return (
     <div
       className={cn(
-        "rounded-lg border border-[#30363d] bg-[#161b22] transition-all",
-        isError && "border-[#e94560]/40",
+        "rounded-lg border border-border bg-card transition-all",
+        isError && "border-crimson/40",
         className
       )}
     >
@@ -63,21 +63,21 @@ export function ToolCallStatus({ toolCall, className }: ToolCallStatusProps) {
         onClick={() => setExpanded((v) => !v)}
         className={cn(
           "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
-          "hover:bg-[#1c2128] rounded-lg cursor-pointer select-none"
+          "hover:bg-muted rounded-lg cursor-pointer select-none"
         )}
       >
         {/* Status indicator */}
         {isRunning ? (
           <span className="relative flex h-4 w-4 shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#d4af37] opacity-60" />
-            <span className="relative inline-flex h-4 w-4 rounded-full bg-[#d4af37]/80" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold opacity-60" />
+            <span className="relative inline-flex h-4 w-4 rounded-full bg-gold/80" />
           </span>
         ) : isError ? (
-          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#e94560]/80 text-[10px] text-white">
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-crimson/80 text-[10px] text-white">
             !
           </span>
         ) : (
-          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#50c878]/80 text-[10px] text-[#0d1117]">
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-jade/80 text-[10px] text-background">
             ✓
           </span>
         )}
@@ -86,17 +86,17 @@ export function ToolCallStatus({ toolCall, className }: ToolCallStatusProps) {
         <span aria-hidden="true" className="text-base">
           {icon}
         </span>
-        <span className="font-medium text-[#e6edf3]">{label}</span>
+        <span className="font-medium text-foreground">{label}</span>
 
         {/* Status text */}
         <span
           className={cn(
             "ml-auto text-xs",
             isRunning
-              ? "text-[#d4af37]"
+              ? "text-gold"
               : isError
-                ? "text-[#e94560]"
-                : "text-[#8b949e]"
+                ? "text-crimson"
+                : "text-muted-foreground"
           )}
         >
           {isRunning ? "调用中..." : isError ? "调用失败" : "已完成"}
@@ -105,7 +105,7 @@ export function ToolCallStatus({ toolCall, className }: ToolCallStatusProps) {
         {/* Expand chevron */}
         <span
           className={cn(
-            "ml-1 text-[#8b949e] transition-transform",
+            "ml-1 text-muted-foreground transition-transform",
             expanded && "rotate-180"
           )}
         >
@@ -115,14 +115,14 @@ export function ToolCallStatus({ toolCall, className }: ToolCallStatusProps) {
 
       {/* Expandable body */}
       {expanded && (
-        <div className="border-t border-[#30363d] px-3 py-2 space-y-2">
+        <div className="border-t border-border px-3 py-2 space-y-2">
           {/* Arguments */}
           {toolCall.arguments && (
             <div>
-              <h4 className="text-xs font-medium text-[#8b949e] mb-1">
+              <h4 className="text-xs font-medium text-muted-foreground mb-1">
                 参数
               </h4>
-              <pre className="overflow-x-auto rounded bg-[#0d1117] p-2 text-xs text-[#e6edf3] whitespace-pre-wrap break-all">
+              <pre className="overflow-x-auto rounded bg-background p-2 text-xs text-foreground whitespace-pre-wrap break-all">
                 {tryFormatJSON(toolCall.arguments)}
               </pre>
             </div>
@@ -131,10 +131,10 @@ export function ToolCallStatus({ toolCall, className }: ToolCallStatusProps) {
           {/* Result */}
           {toolCall.result !== null && (
             <div>
-              <h4 className="text-xs font-medium text-[#8b949e] mb-1">
+              <h4 className="text-xs font-medium text-muted-foreground mb-1">
                 结果
               </h4>
-              <pre className="overflow-x-auto rounded bg-[#0d1117] p-2 text-xs text-[#e6edf3] whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
+              <pre className="overflow-x-auto rounded bg-background p-2 text-xs text-foreground whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
                 {tryFormatJSON(toolCall.result)}
               </pre>
             </div>
@@ -142,7 +142,7 @@ export function ToolCallStatus({ toolCall, className }: ToolCallStatusProps) {
 
           {/* Running indicator */}
           {isRunning && !toolCall.result && (
-            <p className="text-xs text-[#8b949e] italic">
+            <p className="text-xs text-muted-foreground italic">
               正在获取结果...
             </p>
           )}

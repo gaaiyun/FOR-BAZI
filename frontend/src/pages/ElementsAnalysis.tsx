@@ -5,18 +5,12 @@
  */
 
 import { useMemo } from "react";
+import { PageHeader, Section, EmptyState } from "@/components/layout/Page";
 import { useBaziStore } from "@/stores/useBaziStore";
 import { ELEMENT_COLORS } from "@/lib/wuxing-colors";
 import type { WuxingPower } from "@/types/bazi";
 import WuxingRadar from "@/components/bazi/WuxingRadar";
 import WuxingBar from "@/components/bazi/WuxingBar";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
@@ -105,17 +99,8 @@ export default function ElementsAnalysis() {
   if (!reading || !elementData) {
     return (
       <div className="animate-fade-in">
-        <h1 className="font-heading text-2xl font-semibold text-gold">
-          五行 · Five Elements
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          请先在排盘页面输入出生信息，再查看五行分析。
-        </p>
-        <div className="mt-8 rounded-lg border border-[#30363d] bg-[#161b22]/60 p-6">
-          <p className="text-sm text-muted-foreground">
-            暂无命盘数据。请先进行排盘计算。
-          </p>
-        </div>
+        <PageHeader title="五行" en="Five Elements" description="含藏干、月令加权与十二长生的力量精算" />
+        <EmptyState />
       </div>
     );
   }
@@ -124,22 +109,13 @@ export default function ElementsAnalysis() {
 
   return (
     <div className="animate-fade-in space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-gold">
-          五行 · Five Elements
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Analysis of the five Wuxing elements balance and interactions.
-        </p>
-      </div>
+      <PageHeader title="五行" en="Five Elements" description="含藏干、月令加权与十二长生的力量精算" />
 
       {/* ── Strong/Weak Assessment ──────────────────────────────── */}
-      <Card className="bg-[#161b22]/60 border-[#30363d]">
-        <CardHeader>
-          <CardTitle className="text-foreground">强弱评估</CardTitle>
-          <CardDescription>日主: {reading.chart.day_master_element}（{reading.chart.day_master}）</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Section
+        title="强弱评估"
+        description={`日主 ${reading.chart.day_master}（${reading.chart.day_master_element}）`}
+      >
           <div className="flex flex-wrap gap-4">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">最强:</span>
@@ -174,7 +150,7 @@ export default function ElementsAnalysis() {
             <div className="mt-4 space-y-1">
               <p className="text-sm font-medium text-foreground">优势:</p>
               {reading.strengths.map((s, i) => (
-                <p key={i} className="text-sm text-muted-foreground pl-3 border-l-2 border-[#50c878]/40">
+                <p key={i} className="text-sm text-muted-foreground pl-3 border-l-2 border-jade/40">
                   {s}
                 </p>
               ))}
@@ -184,45 +160,27 @@ export default function ElementsAnalysis() {
             <div className="mt-4 space-y-1">
               <p className="text-sm font-medium text-foreground">不足:</p>
               {reading.weaknesses.map((w, i) => (
-                <p key={i} className="text-sm text-muted-foreground pl-3 border-l-2 border-[#e94560]/40">
+                <p key={i} className="text-sm text-muted-foreground pl-3 border-l-2 border-crimson/40">
                   {w}
                 </p>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </Section>
 
       {/* ── Charts Row ──────────────────────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="bg-[#161b22]/60 border-[#30363d]">
-          <CardHeader>
-            <CardTitle className="text-foreground">五行雷达图</CardTitle>
-            <CardDescription>五行力量分布总览</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Section title="五行雷达图" description="五行力量分布总览">
             <WuxingRadar wuxingPower={raw} height={340} />
-          </CardContent>
-        </Card>
+          </Section>
 
-        <Card className="bg-[#161b22]/60 border-[#30363d]">
-          <CardHeader>
-            <CardTitle className="text-foreground">五行力量柱状图</CardTitle>
-            <CardDescription>各元素力量百分比</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Section title="五行力量柱状图" description="各元素力量百分比">
             <WuxingBar wuxingPower={raw} height={340} />
-          </CardContent>
-        </Card>
+          </Section>
       </div>
 
       {/* ── Detailed Breakdown ──────────────────────────────────── */}
-      <Card className="bg-[#161b22]/60 border-[#30363d]">
-        <CardHeader>
-          <CardTitle className="text-foreground">五行详解</CardTitle>
-          <CardDescription>每个元素的来源与力量占比</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Section title="五行详解" description="每个元素的来源与力量占比">
           <div className="space-y-4">
             {ELEMENTS.map((el, i) => (
               <div key={el}>
@@ -250,7 +208,7 @@ export default function ElementsAnalysis() {
                       </span>
                     </div>
                     {/* Progress bar */}
-                    <div className="mt-2 h-2 w-full rounded-full bg-[#1c2128]">
+                    <div className="mt-2 h-2 w-full rounded-full bg-muted">
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
@@ -271,20 +229,14 @@ export default function ElementsAnalysis() {
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </Section>
 
       {/* ── Favorable / Unfavorable ─────────────────────────────── */}
       {(reading.favorable_elements?.length > 0 ||
         reading.unfavorable_elements?.length > 0) && (
         <div className="grid gap-6 md:grid-cols-2">
           {reading.favorable_elements?.length > 0 && (
-            <Card className="bg-[#161b22]/60 border-[#50c878]/30">
-              <CardHeader>
-                <CardTitle className="text-[#50c878]">喜用神</CardTitle>
-                <CardDescription>有利的五行元素</CardDescription>
-              </CardHeader>
-              <CardContent>
+            <Section title="喜用神" description="有利的五行元素">
                 <div className="flex flex-wrap gap-2">
                   {reading.favorable_elements.map((el) => (
                     <Badge
@@ -301,16 +253,10 @@ export default function ElementsAnalysis() {
                     </Badge>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </Section>
           )}
           {reading.unfavorable_elements?.length > 0 && (
-            <Card className="bg-[#161b22]/60 border-[#e94560]/30">
-              <CardHeader>
-                <CardTitle className="text-[#e94560]">忌神</CardTitle>
-                <CardDescription>不利的五行元素</CardDescription>
-              </CardHeader>
-              <CardContent>
+            <Section title="忌神" description="不利的五行元素">
                 <div className="flex flex-wrap gap-2">
                   {reading.unfavorable_elements.map((el) => (
                     <Badge
@@ -327,8 +273,7 @@ export default function ElementsAnalysis() {
                     </Badge>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </Section>
           )}
         </div>
       )}

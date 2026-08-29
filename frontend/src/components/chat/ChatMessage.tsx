@@ -34,9 +34,9 @@ function formatTime(ts: number): string {
 function StreamingDots() {
   return (
     <span className="inline-flex gap-1 items-center ml-1">
-      <span className="h-1.5 w-1.5 rounded-full bg-[#50c878] animate-bounce [animation-delay:0ms]" />
-      <span className="h-1.5 w-1.5 rounded-full bg-[#50c878] animate-bounce [animation-delay:150ms]" />
-      <span className="h-1.5 w-1.5 rounded-full bg-[#50c878] animate-bounce [animation-delay:300ms]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-jade animate-bounce [animation-delay:0ms]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-jade animate-bounce [animation-delay:150ms]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-jade animate-bounce [animation-delay:300ms]" />
     </span>
   );
 }
@@ -55,7 +55,7 @@ const markdownComponents = {
   ),
   h1: ({ children, ...props }: React.ComponentProps<"h1">) => (
     <h1
-      className="font-heading text-xl font-semibold text-[#d4af37] mb-2 mt-3 first:mt-0"
+      className="font-heading text-xl font-semibold text-gold mb-2 mt-3 first:mt-0"
       {...props}
     >
       {children}
@@ -63,7 +63,7 @@ const markdownComponents = {
   ),
   h2: ({ children, ...props }: React.ComponentProps<"h2">) => (
     <h2
-      className="font-heading text-lg font-semibold text-[#d4af37] mb-2 mt-3 first:mt-0"
+      className="font-heading text-lg font-semibold text-gold mb-2 mt-3 first:mt-0"
       {...props}
     >
       {children}
@@ -71,20 +71,20 @@ const markdownComponents = {
   ),
   h3: ({ children, ...props }: React.ComponentProps<"h3">) => (
     <h3
-      className="font-heading text-base font-semibold text-[#e6edf3] mb-1 mt-2 first:mt-0"
+      className="font-heading text-base font-semibold text-foreground mb-1 mt-2 first:mt-0"
       {...props}
     >
       {children}
     </h3>
   ),
   ul: ({ children, ...props }: React.ComponentProps<"ul">) => (
-    <ul className="list-disc list-inside mb-2 space-y-1 text-[#e6edf3]" {...props}>
+    <ul className="list-disc list-inside mb-2 space-y-1 text-foreground" {...props}>
       {children}
     </ul>
   ),
   ol: ({ children, ...props }: React.ComponentProps<"ol">) => (
     <ol
-      className="list-decimal list-inside mb-2 space-y-1 text-[#e6edf3]"
+      className="list-decimal list-inside mb-2 space-y-1 text-foreground"
       {...props}
     >
       {children}
@@ -99,9 +99,9 @@ const markdownComponents = {
     const isBlock = className?.includes("language-");
     if (isBlock) {
       return (
-        <pre className="mb-2 rounded-lg bg-[#0d1117] border border-[#30363d] p-3 overflow-x-auto">
+        <pre className="mb-2 rounded-lg bg-background border border-border p-3 overflow-x-auto">
           <code
-            className={cn("text-xs text-[#e6edf3]", className)}
+            className={cn("text-xs text-foreground", className)}
             {...props}
           >
             {children}
@@ -111,7 +111,7 @@ const markdownComponents = {
     }
     return (
       <code
-        className="rounded bg-[#1c2128] px-1.5 py-0.5 text-xs text-[#d4af37] font-mono"
+        className="rounded bg-muted px-1.5 py-0.5 text-xs text-gold font-mono"
         {...props}
       >
         {children}
@@ -120,7 +120,7 @@ const markdownComponents = {
   },
   blockquote: ({ children, ...props }: React.ComponentProps<"blockquote">) => (
     <blockquote
-      className="border-l-2 border-[#d4af37] pl-3 mb-2 text-[#8b949e] italic"
+      className="border-l-2 border-gold pl-3 mb-2 text-muted-foreground italic"
       {...props}
     >
       {children}
@@ -129,7 +129,7 @@ const markdownComponents = {
   table: ({ children, ...props }: React.ComponentProps<"table">) => (
     <div className="mb-2 overflow-x-auto">
       <table
-        className="w-full text-sm border-collapse border border-[#30363d]"
+        className="w-full text-sm border-collapse border border-border"
         {...props}
       >
         {children}
@@ -138,7 +138,7 @@ const markdownComponents = {
   ),
   th: ({ children, ...props }: React.ComponentProps<"th">) => (
     <th
-      className="border border-[#30363d] bg-[#1c2128] px-2 py-1 text-left text-xs font-medium text-[#d4af37]"
+      className="border border-border bg-muted px-2 py-1 text-left text-xs font-medium text-gold"
       {...props}
     >
       {children}
@@ -146,28 +146,28 @@ const markdownComponents = {
   ),
   td: ({ children, ...props }: React.ComponentProps<"td">) => (
     <td
-      className="border border-[#30363d] px-2 py-1 text-xs text-[#e6edf3]"
+      className="border border-border px-2 py-1 text-xs text-foreground"
       {...props}
     >
       {children}
     </td>
   ),
   hr: ({ ...props }: React.ComponentProps<"hr">) => (
-    <hr className="my-3 border-[#30363d]" {...props} />
+    <hr className="my-3 border-border" {...props} />
   ),
   a: ({ children, href, ...props }: React.ComponentProps<"a">) => (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-[#4a90d9] hover:underline"
+      className="text-azure hover:underline"
       {...props}
     >
       {children}
     </a>
   ),
   strong: ({ children, ...props }: React.ComponentProps<"strong">) => (
-    <strong className="font-semibold text-[#d4af37]" {...props}>
+    <strong className="font-semibold text-gold" {...props}>
       {children}
     </strong>
   ),
@@ -214,8 +214,8 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
         className={cn(
           "relative max-w-[85%] rounded-xl px-4 py-3 text-sm leading-relaxed",
           isUser
-            ? "border-r-2 border-[#d4af37] bg-[#1c2128] text-[#e6edf3]"
-            : "border-l-2 border-[#50c878] bg-[#161b22] text-[#e6edf3]",
+            ? "border-r-2 border-gold bg-muted text-foreground"
+            : "border-l-2 border-jade bg-card text-foreground",
           "animate-fade-in"
         )}
       >
@@ -224,12 +224,12 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
           <span
             className={cn(
               "text-xs font-medium",
-              isUser ? "text-[#d4af37]" : "text-[#50c878]"
+              isUser ? "text-gold" : "text-jade"
             )}
           >
             {isUser ? "你" : "玄冥大师"}
           </span>
-          <span className="text-xs text-[#8b949e]">
+          <span className="text-xs text-muted-foreground">
             {formatTime(message.timestamp)}
           </span>
         </div>
@@ -250,7 +250,7 @@ export const ChatMessageBubble = memo(function ChatMessageBubble({
 
         {/* Streaming indicator */}
         {isStreaming && !message.content && (
-          <div className="flex items-center gap-2 text-[#8b949e]">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <span className="text-xs">正在思考</span>
             <StreamingDots />
           </div>

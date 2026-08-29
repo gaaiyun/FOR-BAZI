@@ -40,7 +40,7 @@ export default function BaziCalculator() {
           <Skeleton className="mt-2 h-4 w-96" />
         </div>
         <div className="grid gap-6 md:grid-cols-2">
-          <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+          <Card className="border border-border bg-card/60 backdrop-blur-md">
             <CardHeader>
               <Skeleton className="h-6 w-40" />
             </CardHeader>
@@ -51,7 +51,7 @@ export default function BaziCalculator() {
               <Skeleton className="h-10 w-32" />
             </CardContent>
           </Card>
-          <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+          <Card className="border border-border bg-card/60 backdrop-blur-md">
             <CardHeader>
               <Skeleton className="h-6 w-40" />
             </CardHeader>

@@ -83,8 +83,8 @@ export function ChatInput({ onSend, disabled = false, className }: ChatInputProp
     <form
       onSubmit={handleSubmit}
       className={cn(
-        "flex items-end gap-2 rounded-xl border border-[#30363d] bg-[#161b22] p-3 transition-colors",
-        "focus-within:border-[#d4af37]/50",
+        "flex items-end gap-2 rounded-xl border border-border bg-card p-3 transition-colors",
+        "focus-within:border-gold/50",
         disabled && "opacity-60",
         className
       )}
@@ -98,7 +98,7 @@ export function ChatInput({ onSend, disabled = false, className }: ChatInputProp
         placeholder="向玄冥大师提问..."
         rows={1}
         className={cn(
-          "flex-1 resize-none bg-transparent text-sm text-[#e6edf3] placeholder:text-[#8b949e]",
+          "flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground",
           "outline-none border-none leading-relaxed",
           "min-h-[24px] max-h-[160px]"
         )}
@@ -109,9 +109,9 @@ export function ChatInput({ onSend, disabled = false, className }: ChatInputProp
         disabled={disabled || !value.trim()}
         className={cn(
           "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all",
-          "bg-[#d4af37] text-[#0d1117] hover:bg-[#d4af37]/80",
+          "bg-gold text-background hover:bg-gold/80",
           "disabled:opacity-40 disabled:cursor-not-allowed",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/50"
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
         )}
         aria-label="发送消息"
       >

@@ -27,9 +27,9 @@ function ChartSummarySidebar() {
   if (!reading) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
-        <span className="text-3xl text-[#8b949e]">☷</span>
-        <p className="text-sm text-[#8b949e]">尚未排盘</p>
-        <p className="text-xs text-[#8b949e]/60">
+        <span className="text-3xl text-muted-foreground">☷</span>
+        <p className="text-sm text-muted-foreground">尚未排盘</p>
+        <p className="text-xs text-muted-foreground/60">
           请先在排盘页面输入出生信息
         </p>
       </div>
@@ -41,7 +41,7 @@ function ChartSummarySidebar() {
   return (
     <div className="flex flex-col gap-4 p-4 text-sm">
       {/* Title */}
-      <h2 className="font-heading text-base font-semibold text-[#d4af37]">
+      <h2 className="font-heading text-base font-semibold text-gold">
         命盘摘要
       </h2>
 
@@ -60,11 +60,11 @@ function ChartSummarySidebar() {
           ].indexOf(key);
           return (
             <div key={key} className="flex flex-col items-center gap-1">
-              <span className="text-xs text-[#8b949e]">{labels[idx]}</span>
-              <span className="text-lg font-heading text-[#e6edf3]">
+              <span className="text-xs text-muted-foreground">{labels[idx]}</span>
+              <span className="text-lg font-heading text-foreground">
                 {pillar.stem}
               </span>
-              <span className="text-lg font-heading text-[#e6edf3]">
+              <span className="text-lg font-heading text-foreground">
                 {pillar.branch}
               </span>
             </div>
@@ -73,11 +73,11 @@ function ChartSummarySidebar() {
       </div>
 
       {/* Day Master */}
-      <div className="rounded-lg border border-[#30363d] bg-[#161b22] p-3">
-        <span className="text-xs text-[#8b949e]">日主</span>
-        <p className="font-heading text-lg text-[#e6edf3]">
+      <div className="rounded-lg border border-border bg-card p-3">
+        <span className="text-xs text-muted-foreground">日主</span>
+        <p className="font-heading text-lg text-foreground">
           {chart.day_master}{" "}
-          <span className="text-sm text-[#8b949e]">
+          <span className="text-sm text-muted-foreground">
             ({chart.day_master_element})
           </span>
         </p>
@@ -85,7 +85,7 @@ function ChartSummarySidebar() {
 
       {/* Element Balance */}
       <div>
-        <h3 className="text-xs font-medium text-[#8b949e] mb-2">五行分布</h3>
+        <h3 className="text-xs font-medium text-muted-foreground mb-2">五行分布</h3>
         <div className="flex gap-1">
           {Object.entries(element_balance).map(([el, count]) => {
             const color = ELEMENT_COLORS[el] ?? "#e6edf3";
@@ -96,7 +96,7 @@ function ChartSummarySidebar() {
             const pct = total > 0 ? (count / total) * 100 : 0;
             return (
               <div key={el} className="flex flex-col items-center flex-1 gap-1">
-                <div className="relative w-full h-16 rounded bg-[#0d1117] overflow-hidden">
+                <div className="relative w-full h-16 rounded bg-background overflow-hidden">
                   <div
                     className="absolute bottom-0 w-full rounded-t transition-all"
                     style={{
@@ -109,7 +109,7 @@ function ChartSummarySidebar() {
                 <span className="text-xs" style={{ color }}>
                   {el}
                 </span>
-                <span className="text-xs text-[#8b949e]">{count}</span>
+                <span className="text-xs text-muted-foreground">{count}</span>
               </div>
             );
           })}
@@ -119,7 +119,7 @@ function ChartSummarySidebar() {
       {/* Favorable Elements */}
       {favorable_elements.length > 0 && (
         <div>
-          <h3 className="text-xs font-medium text-[#8b949e] mb-1">喜用神</h3>
+          <h3 className="text-xs font-medium text-muted-foreground mb-1">喜用神</h3>
           <div className="flex flex-wrap gap-1">
             {favorable_elements.map((el) => (
               <span
@@ -140,8 +140,8 @@ function ChartSummarySidebar() {
       {/* Summary */}
       {summary && (
         <div>
-          <h3 className="text-xs font-medium text-[#8b949e] mb-1">概述</h3>
-          <p className="text-xs text-[#8b949e] leading-relaxed line-clamp-6">
+          <h3 className="text-xs font-medium text-muted-foreground mb-1">概述</h3>
+          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-6">
             {summary}
           </p>
         </div>
@@ -240,7 +240,7 @@ export default function Chat() {
   return (
     <div className="animate-fade-in flex h-[calc(100vh-80px)] gap-4">
       {/* Sidebar: chart summary */}
-      <aside className="hidden w-64 shrink-0 lg:block rounded-xl border border-[#30363d] bg-[#0d1117] overflow-y-auto">
+      <aside className="hidden w-64 shrink-0 lg:block rounded-xl border border-border bg-background overflow-y-auto">
         <ChartSummarySidebar />
       </aside>
 

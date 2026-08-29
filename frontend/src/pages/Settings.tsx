@@ -137,7 +137,7 @@ export default function Settings() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* ── AI Provider Configuration ─────────────────────────── */}
-        <Card className="bg-[#161b22]/60 border-[#30363d]">
+        <Card className="bg-card/60 border-border">
           <CardHeader>
             <CardTitle className="text-foreground">AI Provider</CardTitle>
             <CardDescription>
@@ -167,7 +167,7 @@ export default function Settings() {
             <Separator />
 
             {provider === "cloudflare" ? (
-              <div className="rounded-md bg-[#0d1117] border border-[#30363d] p-4 space-y-2">
+              <div className="rounded-md bg-background border border-border p-4 space-y-2">
                 <p className="text-sm text-foreground font-medium">
                   Cloudflare Workers AI (免费)
                 </p>
@@ -255,7 +255,7 @@ export default function Settings() {
                 aria-checked={streaming}
                 onClick={() => setStreaming(!streaming)}
                 className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                  streaming ? "bg-[#d4af37]" : "bg-[#30363d]"
+                  streaming ? "bg-gold" : "bg-border"
                 }`}
               >
                 <span
@@ -284,7 +284,7 @@ export default function Settings() {
 
         {/* ── Appearance & Info ─────────────────────────────────── */}
         <div className="space-y-6">
-          <Card className="bg-[#161b22]/60 border-[#30363d]">
+          <Card className="bg-card/60 border-border">
             <CardHeader>
               <CardTitle className="text-foreground">外观</CardTitle>
               <CardDescription>主题与显示设置</CardDescription>
@@ -306,7 +306,7 @@ export default function Settings() {
                   aria-checked={theme === "dark"}
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                    theme === "dark" ? "bg-[#d4af37]" : "bg-[#30363d]"
+                    theme === "dark" ? "bg-gold" : "bg-border"
                   }`}
                 >
                   <span
@@ -319,7 +319,7 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          <Card className="bg-[#161b22]/60 border-[#30363d]">
+          <Card className="bg-card/60 border-border">
             <CardHeader>
               <CardTitle className="text-foreground">当前配置</CardTitle>
               <CardDescription>已保存的AI配置摘要</CardDescription>

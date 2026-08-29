@@ -88,7 +88,7 @@ export function ChatPanel({
   return (
     <div
       className={cn(
-        "flex h-full flex-col rounded-xl border border-[#30363d] bg-[#0d1117] overflow-hidden",
+        "flex h-full flex-col rounded-xl border border-border bg-background overflow-hidden",
         className
       )}
     >
@@ -118,14 +118,14 @@ export function ChatPanel({
 
         {/* Error banner */}
         {error && (
-          <div className="mx-auto max-w-md rounded-lg border border-[#e94560]/40 bg-[#e94560]/10 px-4 py-3 text-sm text-[#e94560]">
+          <div className="mx-auto max-w-md rounded-lg border border-crimson/40 bg-crimson/10 px-4 py-3 text-sm text-crimson">
             <p className="font-medium mb-1">请求出错</p>
-            <p className="text-xs text-[#e94560]/80">{error}</p>
+            <p className="text-xs text-crimson/80">{error}</p>
             {onRetry && (
               <button
                 type="button"
                 onClick={onRetry}
-                className="mt-2 text-xs text-[#d4af37] hover:underline"
+                className="mt-2 text-xs text-gold hover:underline"
               >
                 重试
               </button>
@@ -139,13 +139,13 @@ export function ChatPanel({
 
       {/* Status bar */}
       {isStreaming && status && (
-        <div className="border-t border-[#30363d] bg-[#161b22] px-4 py-1.5">
-          <p className="text-xs text-[#8b949e] animate-pulse">{status}</p>
+        <div className="border-t border-border bg-card px-4 py-1.5">
+          <p className="text-xs text-muted-foreground animate-pulse">{status}</p>
         </div>
       )}
 
       {/* Input area */}
-      <div className="border-t border-[#30363d] bg-[#161b22] p-3">
+      <div className="border-t border-border bg-card p-3">
         <ChatInput
           onSend={onSend}
           disabled={isStreaming || !hasChart}
@@ -170,24 +170,24 @@ function EmptyState({ hasChart }: { hasChart: boolean }) {
               "radial-gradient(circle, rgb(212 175 55 / 0.10) 0%, transparent 68%)",
           }}
         />
-        <span className="relative text-5xl text-[#d4af37]/90">☰</span>
+        <span className="relative text-5xl text-gold/90">☰</span>
       </div>
 
       {hasChart ? (
         <>
-          <h3 className="font-heading text-lg text-[#d4af37]">
+          <h3 className="font-heading text-lg text-gold">
             向玄冥大师提问
           </h3>
-          <p className="max-w-sm text-sm text-[#8b949e]">
+          <p className="max-w-sm text-sm text-muted-foreground">
             命盘已排好，请输入您想了解的问题，玄冥大师将为您解答。
           </p>
         </>
       ) : (
         <>
-          <h3 className="font-heading text-lg text-[#d4af37]">
+          <h3 className="font-heading text-lg text-gold">
             请先排盘
           </h3>
-          <p className="max-w-sm text-sm text-[#8b949e]">
+          <p className="max-w-sm text-sm text-muted-foreground">
             请先在排盘页面输入出生信息，然后向玄冥大师提问。
           </p>
         </>

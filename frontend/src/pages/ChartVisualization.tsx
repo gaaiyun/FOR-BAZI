@@ -90,10 +90,10 @@ export default function ChartVisualization() {
       {/* Header with toggle */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold text-[#d4af37]">
+          <h1 className="font-heading text-2xl font-semibold text-gold">
             命盘 · Chart Visualization
           </h1>
-          <p className="mt-1 text-sm text-[#8b949e]">
+          <p className="mt-1 text-sm text-muted-foreground">
             日主:{" "}
             <span style={{ color: getCharColor(reading.chart.day_master) }}>
               {reading.chart.day_master}
@@ -105,7 +105,7 @@ export default function ChartVisualization() {
           variant="outline"
           size="sm"
           onClick={() => setIsProfessional((v) => !v)}
-          className="border-[#30363d] text-[#8b949e] hover:border-[#d4af37] hover:text-[#d4af37]"
+          className="border-border text-muted-foreground hover:border-gold hover:text-gold"
         >
           {isProfessional ? "切换专业模式 ✓" : "切换专业模式"}
         </Button>
@@ -124,11 +124,11 @@ export default function ChartVisualization() {
         ].map(({ label, value }) => (
           <Card
             key={label}
-            className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md"
+            className="border border-border bg-card/60 backdrop-blur-md"
           >
             <CardContent className="flex flex-col items-center gap-1 py-3">
-              <span className="text-xs text-[#6e7681]">{label}</span>
-              <span className="text-lg font-bold text-[#d4af37]">{value}</span>
+              <span className="text-xs text-muted-foreground">{label}</span>
+              <span className="text-lg font-bold text-gold">{value}</span>
             </CardContent>
           </Card>
         ))}
@@ -136,9 +136,9 @@ export default function ChartVisualization() {
 
       {/* ── Wuxing Charts ─────────────────────────────────────── */}
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+        <Card className="border border-border bg-card/60 backdrop-blur-md">
           <CardHeader className="pb-0">
-            <CardTitle className="text-sm text-[#8b949e]">
+            <CardTitle className="text-sm text-muted-foreground">
               五行力量雷达
             </CardTitle>
           </CardHeader>
@@ -146,9 +146,9 @@ export default function ChartVisualization() {
             <WuxingRadar wuxingPower={wuxingPower} height={280} />
           </CardContent>
         </Card>
-        <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+        <Card className="border border-border bg-card/60 backdrop-blur-md">
           <CardHeader className="pb-0">
-            <CardTitle className="text-sm text-[#8b949e]">
+            <CardTitle className="text-sm text-muted-foreground">
               五行力量柱状
             </CardTitle>
           </CardHeader>
@@ -160,7 +160,7 @@ export default function ChartVisualization() {
 
       {/* ── Tabbed Detail Sections ────────────────────────────── */}
       <Tabs defaultValue="dayun">
-        <TabsList className="bg-[#1c2128]">
+        <TabsList className="bg-muted">
           <TabsTrigger value="dayun">大运流年</TabsTrigger>
           <TabsTrigger value="geju">格局神煞</TabsTrigger>
           <TabsTrigger value="wuxing">五行精算</TabsTrigger>
@@ -168,9 +168,9 @@ export default function ChartVisualization() {
 
         {/* Tab 1: Dayun / Annual Pillars */}
         <TabsContent value="dayun" className="mt-4 space-y-4">
-          <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+          <Card className="border border-border bg-card/60 backdrop-blur-md">
             <CardHeader className="pb-0">
-              <CardTitle className="text-sm text-[#8b949e]">
+              <CardTitle className="text-sm text-muted-foreground">
                 大运流年
               </CardTitle>
             </CardHeader>
@@ -178,7 +178,7 @@ export default function ChartVisualization() {
               {dayunEntries.length > 0 ? (
                 <DayunTimeline dayun={dayunEntries} />
               ) : (
-                <p className="py-8 text-center text-sm text-[#6e7681]">
+                <p className="py-8 text-center text-sm text-muted-foreground">
                   暂无大运数据
                 </p>
               )}
@@ -187,12 +187,12 @@ export default function ChartVisualization() {
 
           {/* Dayun list table */}
           {dayunEntries.length > 0 && (
-            <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+            <Card className="border border-border bg-card/60 backdrop-blur-md">
               <CardContent className="pt-4">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-[#30363d] text-[#8b949e]">
+                      <tr className="border-b border-border text-muted-foreground">
                         <th className="px-3 py-2 text-left">干支</th>
                         <th className="px-3 py-2 text-left">起始年龄</th>
                         <th className="px-3 py-2 text-left">起始年份</th>
@@ -204,8 +204,8 @@ export default function ChartVisualization() {
                       {dayunEntries.map((d, i) => (
                         <tr
                           key={i}
-                          className={`border-b border-[#30363d]/50 ${
-                            d.is_current ? "bg-[#e94560]/10" : ""
+                          className={`border-b border-border/50 ${
+                            d.is_current ? "bg-crimson/10" : ""
                           }`}
                         >
                           <td className="px-3 py-2 font-medium">
@@ -216,22 +216,22 @@ export default function ChartVisualization() {
                               {d.branch}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-[#8b949e]">
+                          <td className="px-3 py-2 text-muted-foreground">
                             {d.start_age} - {d.end_age} 岁
                           </td>
-                          <td className="px-3 py-2 text-[#8b949e]">
+                          <td className="px-3 py-2 text-muted-foreground">
                             {d.start_year}
                           </td>
-                          <td className="px-3 py-2 text-[#8b949e]">
+                          <td className="px-3 py-2 text-muted-foreground">
                             {d.end_year}
                           </td>
                           <td className="px-3 py-2">
                             {d.is_current ? (
-                              <Badge className="bg-[#e94560]/20 text-[#e94560] border-[#e94560]/30 text-xs">
+                              <Badge className="bg-crimson/20 text-crimson border-crimson/30 text-xs">
                                 当前
                               </Badge>
                             ) : (
-                              <span className="text-[#6e7681]">—</span>
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </td>
                         </tr>
@@ -245,9 +245,9 @@ export default function ChartVisualization() {
 
           {/* Annual pillars preview */}
           {reading.annual_pillars?.length > 0 && (
-            <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+            <Card className="border border-border bg-card/60 backdrop-blur-md">
               <CardHeader className="pb-0">
-                <CardTitle className="text-sm text-[#8b949e]">
+                <CardTitle className="text-sm text-muted-foreground">
                   近年流年
                 </CardTitle>
               </CardHeader>
@@ -256,9 +256,9 @@ export default function ChartVisualization() {
                   {reading.annual_pillars.slice(0, 12).map((ap, i) => (
                     <div
                       key={i}
-                      className="flex flex-col items-center rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2"
+                      className="flex flex-col items-center rounded-lg border border-border bg-background px-3 py-2"
                     >
-                      <span className="text-xs text-[#8b949e]">{ap.year}</span>
+                      <span className="text-xs text-muted-foreground">{ap.year}</span>
                       <span style={{ color: getCharColor(ap.stem) }}>
                         {ap.stem}
                       </span>
@@ -277,18 +277,18 @@ export default function ChartVisualization() {
         <TabsContent value="geju" className="mt-4 space-y-4">
           {/* Geju analysis */}
           {reading.geju ? (
-            <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+            <Card className="border border-border bg-card/60 backdrop-blur-md">
               <CardHeader className="pb-0">
-                <CardTitle className="text-[#e6edf3]">
+                <CardTitle className="text-foreground">
                   格局: {reading.geju.geju_type}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-sm text-[#8b949e]">
+                <p className="text-sm text-muted-foreground">
                   {reading.geju.description}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <span className="text-xs text-[#6e7681]">喜用神:</span>
+                  <span className="text-xs text-muted-foreground">喜用神:</span>
                   {reading.geju.favorable_elements.map((el, i) => (
                     <Badge
                       key={i}
@@ -305,7 +305,7 @@ export default function ChartVisualization() {
                   ))}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <span className="text-xs text-[#6e7681]">忌神:</span>
+                  <span className="text-xs text-muted-foreground">忌神:</span>
                   {reading.geju.unfavorable_elements.map((el, i) => (
                     <Badge
                       key={i}
@@ -324,8 +324,8 @@ export default function ChartVisualization() {
               </CardContent>
             </Card>
           ) : (
-            <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
-              <CardContent className="py-8 text-center text-sm text-[#6e7681]">
+            <Card className="border border-border bg-card/60 backdrop-blur-md">
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
                 暂无格局分析数据
               </CardContent>
             </Card>
@@ -333,9 +333,9 @@ export default function ChartVisualization() {
 
           {/* ShenSha list */}
           {reading.all_shensha && reading.all_shensha.length > 0 && (
-            <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+            <Card className="border border-border bg-card/60 backdrop-blur-md">
               <CardHeader className="pb-0">
-                <CardTitle className="text-sm text-[#8b949e]">
+                <CardTitle className="text-sm text-muted-foreground">
                   神煞一览
                 </CardTitle>
               </CardHeader>
@@ -378,9 +378,9 @@ export default function ChartVisualization() {
 
           {/* XingChong */}
           {reading.xingchong && reading.xingchong.length > 0 && (
-            <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+            <Card className="border border-border bg-card/60 backdrop-blur-md">
               <CardHeader className="pb-0">
-                <CardTitle className="text-sm text-[#8b949e]">
+                <CardTitle className="text-sm text-muted-foreground">
                   刑冲合害
                 </CardTitle>
               </CardHeader>
@@ -390,7 +390,7 @@ export default function ChartVisualization() {
                     <Badge
                       key={i}
                       variant="destructive"
-                      className="bg-[#e94560]/10 text-[#e94560] border-[#e94560]/30 text-xs"
+                      className="bg-crimson/10 text-crimson border-crimson/30 text-xs"
                     >
                       {xc}
                     </Badge>
@@ -403,9 +403,9 @@ export default function ChartVisualization() {
 
         {/* Tab 3: Wuxing detail breakdown */}
         <TabsContent value="wuxing" className="mt-4 space-y-4">
-          <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+          <Card className="border border-border bg-card/60 backdrop-blur-md">
             <CardHeader className="pb-0">
-              <CardTitle className="text-sm text-[#8b949e]">
+              <CardTitle className="text-sm text-muted-foreground">
                 五行精算
               </CardTitle>
             </CardHeader>
@@ -413,7 +413,7 @@ export default function ChartVisualization() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-[#30363d] text-[#8b949e]">
+                    <tr className="border-b border-border text-muted-foreground">
                       <th className="px-3 py-2 text-left">五行</th>
                       <th className="px-3 py-2 text-left">力量</th>
                       <th className="px-3 py-2 text-left">占比</th>
@@ -436,7 +436,7 @@ export default function ChartVisualization() {
                       return (
                         <tr
                           key={el}
-                          className="border-b border-[#30363d]/50"
+                          className="border-b border-border/50"
                         >
                           <td className="px-3 py-2">
                             <span
@@ -446,10 +446,10 @@ export default function ChartVisualization() {
                               {el}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-[#8b949e]">{val}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{val}</td>
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-2">
-                              <div className="h-2 w-24 overflow-hidden rounded-full bg-[#30363d]">
+                              <div className="h-2 w-24 overflow-hidden rounded-full bg-border">
                                 <div
                                   className="h-full rounded-full transition-all"
                                   style={{
@@ -458,7 +458,7 @@ export default function ChartVisualization() {
                                   }}
                                 />
                               </div>
-                              <span className="text-xs text-[#8b949e]">
+                              <span className="text-xs text-muted-foreground">
                                 {pct}%
                               </span>
                             </div>
@@ -467,7 +467,7 @@ export default function ChartVisualization() {
                             {isFavorable && (
                               <Badge
                                 variant="secondary"
-                                className="bg-[#50c878]/15 text-[#50c878] border-[#50c878]/30 text-xs"
+                                className="bg-jade/15 text-jade border-jade/30 text-xs"
                               >
                                 喜用
                               </Badge>
@@ -475,7 +475,7 @@ export default function ChartVisualization() {
                             {isUnfavorable && (
                               <Badge
                                 variant="destructive"
-                                className="bg-[#e94560]/10 text-[#e94560] border-[#e94560]/30 text-xs"
+                                className="bg-crimson/10 text-crimson border-crimson/30 text-xs"
                               >
                                 忌神
                               </Badge>
@@ -492,9 +492,9 @@ export default function ChartVisualization() {
 
           {/* Ten gods overview */}
           {reading.ten_gods?.length > 0 && (
-            <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+            <Card className="border border-border bg-card/60 backdrop-blur-md">
               <CardHeader className="pb-0">
-                <CardTitle className="text-sm text-[#8b949e]">
+                <CardTitle className="text-sm text-muted-foreground">
                   十神一览
                 </CardTitle>
               </CardHeader>
@@ -503,7 +503,7 @@ export default function ChartVisualization() {
                   {reading.ten_gods.map((tg, i) => (
                     <div
                       key={i}
-                      className="flex items-center gap-2 rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2"
+                      className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2"
                     >
                       <span
                         className="font-bold"
@@ -511,18 +511,18 @@ export default function ChartVisualization() {
                       >
                         {tg.character}
                       </span>
-                      <span className="text-xs text-[#8b949e]">{tg.name}</span>
+                      <span className="text-xs text-muted-foreground">{tg.name}</span>
                       {tg.is_favorable ? (
                         <Badge
                           variant="secondary"
-                          className="bg-[#50c878]/15 text-[#50c878] border-[#50c878]/30 text-[10px]"
+                          className="bg-jade/15 text-jade border-jade/30 text-[10px]"
                         >
                           吉
                         </Badge>
                       ) : (
                         <Badge
                           variant="destructive"
-                          className="bg-[#e94560]/10 text-[#e94560] border-[#e94560]/30 text-[10px]"
+                          className="bg-crimson/10 text-crimson border-crimson/30 text-[10px]"
                         >
                           凶
                         </Badge>
@@ -536,9 +536,9 @@ export default function ChartVisualization() {
 
           {/* Favorable / Unfavorable summary */}
           <div className="grid gap-4 md:grid-cols-2">
-            <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+            <Card className="border border-border bg-card/60 backdrop-blur-md">
               <CardHeader className="pb-0">
-                <CardTitle className="text-sm text-[#50c878]">
+                <CardTitle className="text-sm text-jade">
                   喜用神
                 </CardTitle>
               </CardHeader>
@@ -559,14 +559,14 @@ export default function ChartVisualization() {
                   ))}
                   {(!reading.favorable_elements ||
                     reading.favorable_elements.length === 0) && (
-                    <span className="text-xs text-[#6e7681]">暂无数据</span>
+                    <span className="text-xs text-muted-foreground">暂无数据</span>
                   )}
                 </div>
               </CardContent>
             </Card>
-            <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+            <Card className="border border-border bg-card/60 backdrop-blur-md">
               <CardHeader className="pb-0">
-                <CardTitle className="text-sm text-[#e94560]">忌神</CardTitle>
+                <CardTitle className="text-sm text-crimson">忌神</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
@@ -585,7 +585,7 @@ export default function ChartVisualization() {
                   ))}
                   {(!reading.unfavorable_elements ||
                     reading.unfavorable_elements.length === 0) && (
-                    <span className="text-xs text-[#6e7681]">暂无数据</span>
+                    <span className="text-xs text-muted-foreground">暂无数据</span>
                   )}
                 </div>
               </CardContent>
@@ -594,14 +594,14 @@ export default function ChartVisualization() {
 
           {/* Summary */}
           {reading.summary && (
-            <Card className="border border-[#30363d] bg-[#161b22]/60 backdrop-blur-md">
+            <Card className="border border-border bg-card/60 backdrop-blur-md">
               <CardHeader className="pb-0">
-                <CardTitle className="text-sm text-[#d4af37]">
+                <CardTitle className="text-sm text-gold">
                   命理总论
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#8b949e]">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
                   {reading.summary}
                 </p>
               </CardContent>

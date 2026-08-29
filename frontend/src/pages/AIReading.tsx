@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PageHeader, EmptyState } from "@/components/layout/Page";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
@@ -111,41 +112,30 @@ export default function AIReading() {
     <div className="animate-fade-in max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="font-heading text-2xl font-semibold text-[#d4af37]">
-          AI 解读 · AI Reading
-        </h1>
-        <p className="mt-2 text-sm text-[#8b949e]">
-          AI 生成的八字命盘全面解读分析
-        </p>
+        <PageHeader
+          title="AI 解读"
+          en="AI Reading"
+          description="在算好的命盘上做解读；引用流年与古籍时必须调用工具取证"
+        />
       </div>
 
       {/* No chart state */}
-      {!reading && (
-        <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-8 text-center">
-          <span className="text-4xl block mb-3">☷</span>
-          <h3 className="font-heading text-lg text-[#d4af37] mb-2">
-            请先排盘
-          </h3>
-          <p className="text-sm text-[#8b949e]">
-            请先在排盘页面输入出生信息，然后进行 AI 解读。
-          </p>
-        </div>
-      )}
+      {!reading && <EmptyState description="AI 解读需要先有命盘。请先在排盘页填写出生信息。" />}
 
       {/* Chart loaded but no analysis yet */}
       {reading && !hasRun && !isStreaming && (
-        <div className="rounded-xl border border-[#30363d] bg-[#0d1117] p-8 text-center space-y-4">
-          <span className="block text-4xl text-[#d4af37]/90">☱</span>
-          <h3 className="font-heading text-lg text-[#d4af37]">
+        <div className="rounded-xl border border-border bg-background p-8 text-center space-y-4">
+          <span className="block text-4xl text-gold/90">☱</span>
+          <h3 className="font-heading text-lg text-gold">
             准备就绪
           </h3>
-          <p className="text-sm text-[#8b949e] max-w-md mx-auto">
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
             命盘已排好，点击下方按钮开始 AI 全面解读。
             分析将包括格局总论、五行喜忌、十神性格、大运走势等方面。
           </p>
           <Button
             onClick={handleStartAnalysis}
-            className="bg-[#d4af37] text-[#0d1117] hover:bg-[#d4af37]/80 font-medium px-6"
+            className="bg-gold text-background hover:bg-gold/80 font-medium px-6"
           >
             开始 AI 解读
           </Button>
@@ -156,22 +146,22 @@ export default function AIReading() {
       {(hasRun || isStreaming) && reading && (
         <div className="space-y-4">
           {/* Control bar */}
-          <div className="flex items-center justify-between rounded-xl border border-[#30363d] bg-[#0d1117] px-4 py-3">
+          <div className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3">
             <div className="flex items-center gap-3">
               {isStreaming ? (
                 <>
                   <span className="relative flex h-3 w-3">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#d4af37] opacity-60" />
-                    <span className="relative inline-flex h-3 w-3 rounded-full bg-[#d4af37]" />
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold opacity-60" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-gold" />
                   </span>
-                  <span className="text-sm text-[#d4af37] animate-pulse">
+                  <span className="text-sm text-gold animate-pulse">
                     {status || "正在分析..."}
                   </span>
                 </>
               ) : (
                 <>
-                  <span className="h-3 w-3 rounded-full bg-[#50c878]" />
-                  <span className="text-sm text-[#8b949e]">
+                  <span className="h-3 w-3 rounded-full bg-jade" />
+                  <span className="text-sm text-muted-foreground">
                     分析完成
                   </span>
                 </>
@@ -184,7 +174,7 @@ export default function AIReading() {
                   variant="outline"
                   size="sm"
                   onClick={abort}
-                  className="border-[#e94560]/40 text-[#e94560] hover:bg-[#e94560]/10"
+                  className="border-crimson/40 text-crimson hover:bg-crimson/10"
                 >
                   停止
                 </Button>
@@ -194,7 +184,7 @@ export default function AIReading() {
                   variant="outline"
                   size="sm"
                   onClick={handleStartAnalysis}
-                  className="border-[#d4af37]/40 text-[#d4af37] hover:bg-[#d4af37]/10"
+                  className="border-gold/40 text-gold hover:bg-gold/10"
                 >
                   重新分析
                 </Button>
@@ -205,7 +195,7 @@ export default function AIReading() {
           {/* Tool calls */}
           {analysisToolCalls.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-xs font-medium text-[#8b949e] px-1">
+              <h3 className="text-xs font-medium text-muted-foreground px-1">
                 工具调用
               </h3>
               {analysisToolCalls.map((tc) => (
@@ -216,13 +206,13 @@ export default function AIReading() {
 
           {/* Fact-check warnings */}
           {factCheckWarnings.length > 0 && (
-            <div className="rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/5 p-4">
-              <h3 className="text-sm font-medium text-[#d4af37] mb-2">
+            <div className="rounded-xl border border-gold/30 bg-gold/5 p-4">
+              <h3 className="text-sm font-medium text-gold mb-2">
                 ⚠️ 注意事项
               </h3>
               <ul className="space-y-1">
                 {factCheckWarnings.map((w, i) => (
-                  <li key={i} className="text-xs text-[#d4af37]/80">
+                  <li key={i} className="text-xs text-gold/80">
                     {w}
                   </li>
                 ))}
@@ -232,14 +222,14 @@ export default function AIReading() {
 
           {/* Analysis content */}
           {analysisContent ? (
-            <div className="rounded-xl border border-[#30363d] bg-[#161b22] p-6">
-              <div className="prose-sm max-w-none text-[#e6edf3]">
+            <div className="rounded-xl border border-border bg-card p-6">
+              <div className="prose-sm max-w-none text-foreground">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
                     h1: ({ children, ...props }: React.ComponentProps<"h1">) => (
                       <h1
-                        className="font-heading text-xl font-semibold text-[#d4af37] mb-3 mt-6 first:mt-0 border-b border-[#30363d] pb-2"
+                        className="font-heading text-xl font-semibold text-gold mb-3 mt-6 first:mt-0 border-b border-border pb-2"
                         {...props}
                       >
                         {children}
@@ -247,7 +237,7 @@ export default function AIReading() {
                     ),
                     h2: ({ children, ...props }: React.ComponentProps<"h2">) => (
                       <h2
-                        className="font-heading text-lg font-semibold text-[#d4af37] mb-2 mt-5 first:mt-0"
+                        className="font-heading text-lg font-semibold text-gold mb-2 mt-5 first:mt-0"
                         {...props}
                       >
                         {children}
@@ -255,7 +245,7 @@ export default function AIReading() {
                     ),
                     h3: ({ children, ...props }: React.ComponentProps<"h3">) => (
                       <h3
-                        className="font-heading text-base font-semibold text-[#e6edf3] mb-2 mt-4 first:mt-0"
+                        className="font-heading text-base font-semibold text-foreground mb-2 mt-4 first:mt-0"
                         {...props}
                       >
                         {children}
@@ -292,7 +282,7 @@ export default function AIReading() {
                       ...props
                     }: React.ComponentProps<"blockquote">) => (
                       <blockquote
-                        className="border-l-2 border-[#d4af37] pl-3 mb-3 text-[#8b949e] italic"
+                        className="border-l-2 border-gold pl-3 mb-3 text-muted-foreground italic"
                         {...props}
                       >
                         {children}
@@ -306,10 +296,10 @@ export default function AIReading() {
                       const isBlock = className?.includes("language-");
                       if (isBlock) {
                         return (
-                          <pre className="mb-3 rounded-lg bg-[#0d1117] border border-[#30363d] p-3 overflow-x-auto">
+                          <pre className="mb-3 rounded-lg bg-background border border-border p-3 overflow-x-auto">
                             <code
                               className={cn(
-                                "text-xs text-[#e6edf3]",
+                                "text-xs text-foreground",
                                 className
                               )}
                               {...props}
@@ -321,7 +311,7 @@ export default function AIReading() {
                       }
                       return (
                         <code
-                          className="rounded bg-[#1c2128] px-1.5 py-0.5 text-xs text-[#d4af37] font-mono"
+                          className="rounded bg-muted px-1.5 py-0.5 text-xs text-gold font-mono"
                           {...props}
                         >
                           {children}
@@ -332,7 +322,7 @@ export default function AIReading() {
                       children,
                       ...props
                     }: React.ComponentProps<"strong">) => (
-                      <strong className="font-semibold text-[#d4af37]" {...props}>
+                      <strong className="font-semibold text-gold" {...props}>
                         {children}
                       </strong>
                     ),
@@ -342,7 +332,7 @@ export default function AIReading() {
                     }: React.ComponentProps<"table">) => (
                       <div className="mb-3 overflow-x-auto">
                         <table
-                          className="w-full text-sm border-collapse border border-[#30363d]"
+                          className="w-full text-sm border-collapse border border-border"
                           {...props}
                         >
                           {children}
@@ -354,7 +344,7 @@ export default function AIReading() {
                       ...props
                     }: React.ComponentProps<"th">) => (
                       <th
-                        className="border border-[#30363d] bg-[#1c2128] px-3 py-2 text-left text-xs font-medium text-[#d4af37]"
+                        className="border border-border bg-muted px-3 py-2 text-left text-xs font-medium text-gold"
                         {...props}
                       >
                         {children}
@@ -365,14 +355,14 @@ export default function AIReading() {
                       ...props
                     }: React.ComponentProps<"td">) => (
                       <td
-                        className="border border-[#30363d] px-3 py-2 text-xs"
+                        className="border border-border px-3 py-2 text-xs"
                         {...props}
                       >
                         {children}
                       </td>
                     ),
                     hr: ({ ...props }: React.ComponentProps<"hr">) => (
-                      <hr className="my-4 border-[#30363d]" {...props} />
+                      <hr className="my-4 border-border" {...props} />
                     ),
                   }}
                 >
@@ -382,16 +372,16 @@ export default function AIReading() {
 
               {/* Streaming cursor */}
               {isStreaming && (
-                <span className="inline-block h-4 w-0.5 bg-[#d4af37] animate-pulse ml-0.5 align-middle" />
+                <span className="inline-block h-4 w-0.5 bg-gold animate-pulse ml-0.5 align-middle" />
               )}
             </div>
           ) : (
             isStreaming && (
-              <div className="rounded-xl border border-[#30363d] bg-[#161b22] p-8 text-center">
-                <div className="flex items-center justify-center gap-2 text-[#8b949e]">
-                  <span className="h-2 w-2 rounded-full bg-[#d4af37] animate-bounce [animation-delay:0ms]" />
-                  <span className="h-2 w-2 rounded-full bg-[#d4af37] animate-bounce [animation-delay:150ms]" />
-                  <span className="h-2 w-2 rounded-full bg-[#d4af37] animate-bounce [animation-delay:300ms]" />
+              <div className="rounded-xl border border-border bg-card p-8 text-center">
+                <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                  <span className="h-2 w-2 rounded-full bg-gold animate-bounce [animation-delay:0ms]" />
+                  <span className="h-2 w-2 rounded-full bg-gold animate-bounce [animation-delay:150ms]" />
+                  <span className="h-2 w-2 rounded-full bg-gold animate-bounce [animation-delay:300ms]" />
                   <span className="ml-2 text-sm">正在生成分析...</span>
                 </div>
               </div>
@@ -400,13 +390,13 @@ export default function AIReading() {
 
           {/* Error */}
           {error && (
-            <div className="rounded-xl border border-[#e94560]/40 bg-[#e94560]/10 px-4 py-3 text-sm text-[#e94560]">
+            <div className="rounded-xl border border-crimson/40 bg-crimson/10 px-4 py-3 text-sm text-crimson">
               <p className="font-medium">分析出错</p>
-              <p className="text-xs text-[#e94560]/80 mt-1">{error}</p>
+              <p className="text-xs text-crimson/80 mt-1">{error}</p>
               <button
                 type="button"
                 onClick={handleStartAnalysis}
-                className="mt-2 text-xs text-[#d4af37] hover:underline"
+                className="mt-2 text-xs text-gold hover:underline"
               >
                 重试
               </button>

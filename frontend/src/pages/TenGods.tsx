@@ -5,15 +5,9 @@
  */
 
 import { useMemo } from "react";
+import { PageHeader, Section, EmptyState } from "@/components/layout/Page";
 import { useBaziStore } from "@/stores/useBaziStore";
 import { getElementColor } from "@/lib/wuxing-colors";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
@@ -136,49 +130,29 @@ export default function TenGods() {
   if (!reading) {
     return (
       <div className="animate-fade-in">
-        <h1 className="font-heading text-2xl font-semibold text-gold">
-          十神 · Ten Gods
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          请先在排盘页面输入出生信息，再查看十神分析。
-        </p>
-        <div className="mt-8 rounded-lg border border-[#30363d] bg-[#161b22]/60 p-6">
-          <p className="text-sm text-muted-foreground">
-            暂无命盘数据。请先进行排盘计算。
-          </p>
-        </div>
+        <PageHeader title="十神" en="Ten Gods" description="日主与其余干支的生克关系及其含义" />
+        <EmptyState />
       </div>
     );
   }
 
   return (
     <div className="animate-fade-in space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-gold">
-          十神 · Ten Gods
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Ten Gods relationships and their significance in the chart.
-        </p>
-      </div>
+      <PageHeader title="十神" en="Ten Gods" description="日主与其余干支的生克关系及其含义" />
 
       {/* ── Pillar-to-Ten-God mapping ───────────────────────────── */}
-      <Card className="bg-[#161b22]/60 border-[#30363d]">
-        <CardHeader>
-          <CardTitle className="text-foreground">四柱十神</CardTitle>
-          <CardDescription>
-            日主: {reading.chart.day_master}（{reading.chart.day_master_element}）
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Section
+        title="四柱十神"
+        description={`日主 ${reading.chart.day_master}（${reading.chart.day_master_element}）`}
+      >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {pillarGods.map((pg) => (
               <div
                 key={pg.label}
                 className={`rounded-lg border p-4 ${
                   pg.isDayMaster
-                    ? "border-[#d4af37]/50 bg-[#d4af37]/5"
-                    : "border-[#30363d] bg-[#0d1117]/60"
+                    ? "border-gold/50 bg-gold/5"
+                    : "border-border bg-background/60"
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -225,16 +199,10 @@ export default function TenGods() {
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </Section>
 
       {/* ── Detailed explanations ───────────────────────────────── */}
-      <Card className="bg-[#161b22]/60 border-[#30363d]">
-        <CardHeader>
-          <CardTitle className="text-foreground">十神详解</CardTitle>
-          <CardDescription>命中出现的十神及其含义</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Section title="十神详解" description="命中出现的十神及其含义">
           {uniqueGods.length > 0 ? (
             <div className="space-y-4">
               {uniqueGods.map((god, i) => (
@@ -272,8 +240,7 @@ export default function TenGods() {
               暂无十神数据。请确保已进行排盘计算。
             </p>
           )}
-        </CardContent>
-      </Card>
+        </Section>
     </div>
   );
 }
