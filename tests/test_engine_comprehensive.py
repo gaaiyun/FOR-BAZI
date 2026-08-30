@@ -976,3 +976,47 @@ class TestCrossFieldConsistency:
                 f"Shensha mismatch at index {i} for {label}: "
                 f"'{formatted[i]}' vs '{expected}'"
             )
+
+
+class TestQiongtongData:
+    """
+    《穷通宝鉴》调候用神的数据正确性。
+
+    起因：庚日_未月 原本写成「丁壬为主，甲为佐」，与权威原文「先用丁火，次取甲木」
+    不符。旁证是邻月巳、午两条的用神正是壬——很可能录入时把邻月的壬串了进来。
+    这类错误不会让程序报错，只会让模型据错误用神作解读，所以必须由测试盯住。
+    """
+
+    @staticmethod
+    def _entries():
+        import json
+        from pathlib import Path
+
+        path = (
+            Path(__file__).resolve().parent.parent
+            / "data"
+            / "classical_texts"
+            / "qiongtong_baojian.json"
+        )
+        return json.loads(path.read_text(encoding="utf-8"))["entries"]
+
+    def test_geng_wei_month_uses_ding_and_jia(self):
+        entry = self._entries()["庚日_未月"]
+        assert "丁" in entry["原文"]
+        assert "甲" in entry["原文"]
+        assert "壬" not in entry["原文"], (
+            "庚金未月调候用神为丁、甲；壬是邻月（巳、午）的用神，不该出现在这里"
+        )
+
+    def test_geng_wei_month_keeps_full_passage(self):
+        entry = self._entries()["庚日_未月"]
+        assert "三伏生寒" in entry["全文"]
+        assert "忌癸伤丁" in entry["全文"], "「忌癸伤丁」是本条唯一可事先定位的忌神条件"
+
+    def test_all_qiongtong_entries_wellformed(self):
+        for key, entry in self._entries().items():
+            assert entry["key"] == key
+            assert entry["原文"].strip(), f"{key} 原文为空"
+            assert entry["出处"] == "穷通宝鉴"
+            assert entry["day_master"] == key[0]
+            assert entry["month_zhi"] == key.split("_")[1][0]
