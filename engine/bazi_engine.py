@@ -23,13 +23,63 @@ _ZHI_HALF_3HE = [("申", "子"), ("子", "辰"), ("申", "辰"), ("巳", "酉"),
                  ("寅", "午"), ("午", "戌"), ("寅", "戌"), ("亥", "卯"), ("卯", "未"), ("亥", "未")]
 
 
+# 天干五合及其化神。此前只算地支关系，天干合克整个漏掉了——
+# 与参天 bazi-MCP 交叉核验时才暴露（如本命年干壬与月干丁「丁壬合木」）。
+_GAN_5HE = {
+    frozenset(("甲", "己")): "土",
+    frozenset(("乙", "庚")): "金",
+    frozenset(("丙", "辛")): "水",
+    frozenset(("丁", "壬")): "木",
+    frozenset(("戊", "癸")): "火",
+}
+
+_GAN_ELEMENT = {
+    "甲": "木", "乙": "木", "丙": "火", "丁": "火", "戊": "土",
+    "己": "土", "庚": "金", "辛": "金", "壬": "水", "癸": "水",
+}
+_ELEMENT_KE = {"木": "土", "土": "水", "水": "火", "火": "金", "金": "木"}
+
+
+def _calculate_gan_relations(pillars: List[str]) -> Dict[str, List[str]]:
+    """
+    天干五合与相克。
+
+    只判**相邻两柱**：传统上天干合克讲究紧贴，隔柱作用力大减。
+    返回的「干合」附带化神，供调候与格局分析参考。
+    """
+    labels = ["年", "月", "日", "时"]
+    gan = [p[0] if p else "" for p in pillars]
+    he: List[str] = []
+    ke: List[str] = []
+
+    for i in range(len(gan) - 1):
+        a, b = gan[i], gan[i + 1]
+        if not a or not b:
+            continue
+        tag = f"{labels[i]}{labels[i + 1]}"
+        hua = _GAN_5HE.get(frozenset((a, b)))
+        if hua and a != b:
+            he.append(f"{tag}干合({a}{b}合{hua})")
+            # 「贪合忘克」：既合则不再以克论。丁壬既是五合又是水克火，
+            # 若两者都报，会把同一对关系算成两笔。
+            continue
+        ea, eb = _GAN_ELEMENT.get(a, ""), _GAN_ELEMENT.get(b, "")
+        if ea and eb:
+            if _ELEMENT_KE.get(ea) == eb:
+                ke.append(f"{tag}干克({a}克{b})")
+            elif _ELEMENT_KE.get(eb) == ea:
+                ke.append(f"{tag}干克({b}克{a})")
+
+    return {"干合": he, "干克": ke}
+
+
 def _calculate_xing_chong_he_hai(pillars: List[str]) -> Dict[str, List[str]]:
     """
-    自动计算四柱间的刑冲合害、三合三会关系。
-    基于传统命理规则，返回刑冲合害破及三合、三会、半三合列表。
+    自动计算四柱间的刑冲合害、三合三会，以及天干五合与相克。
     """
     if len(pillars) < 4:
-        return {"冲": [], "合": [], "刑": [], "害": [], "破": [], "穿": [], "三合": [], "三会": [], "半三合": []}
+        return {"冲": [], "合": [], "刑": [], "害": [], "破": [], "穿": [],
+                "三合": [], "三会": [], "半三合": [], "干合": [], "干克": [], "双合": []}
 
     zhi = [p[1] if len(p) >= 2 else "" for p in pillars]
     labels = ["年", "月", "日", "时"]
@@ -76,7 +126,22 @@ def _calculate_xing_chong_he_hai(pillars: List[str]) -> Dict[str, List[str]]:
         if zhi.count(z) >= 2:
             xing.append(f"{z}自刑")
 
-    return {"冲": chong, "合": he, "刑": xing, "害": hai, "破": po, "穿": [], "三合": san_he, "三会": san_hui, "半三合": half_he}
+    gan_rel = _calculate_gan_relations(pillars)
+
+    # 双合：相邻两柱天干相合且地支亦合，传统上视为该两柱关系格外紧密。
+    shuang_he: List[str] = []
+    for i in range(3):
+        tag = f"{labels[i]}{labels[i + 1]}"
+        if any(h.startswith(f"{tag}干合") for h in gan_rel["干合"]) and any(
+            h.startswith(f"{tag}六合") for h in he
+        ):
+            shuang_he.append(f"{tag}双合(天干地支皆合)")
+
+    return {
+        "冲": chong, "合": he, "刑": xing, "害": hai, "破": po, "穿": [],
+        "三合": san_he, "三会": san_hui, "半三合": half_he,
+        "干合": gan_rel["干合"], "干克": gan_rel["干克"], "双合": shuang_he,
+    }
 
 
 def calculate_professional_bazi(dt: datetime, gender_str: str) -> Dict[str, Any]:

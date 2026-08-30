@@ -588,6 +588,44 @@ class TestToolsWithEngineOutput:
         assert result["relation_type"] == "合"
         assert "description" in result
 
+    # -- 天干五合与相克 --
+
+    def test_gan_he_detected_with_hua_shen(self):
+        """天干五合此前完全没算，是与参天 bazi-MCP 交叉核验时才暴露的缺口。"""
+        chart = _make_chart(2002, 7, 21, 3, 45, "乾造 (Male)")
+        xc = chart["xingchong"]
+        assert xc["干合"] == ["年月干合(壬丁合木)"]
+
+    def test_tan_he_wang_ke(self):
+        """贪合忘克：丁壬既是五合又是水克火，不得同时计为两笔关系。"""
+        chart = _make_chart(2002, 7, 21, 3, 45, "乾造 (Male)")
+        xc = chart["xingchong"]
+        assert any("壬丁合" in h for h in xc["干合"])
+        assert not any("壬克丁" in k or "丁克壬" in k for k in xc["干克"])
+
+    def test_shuang_he_requires_both_gan_and_zhi(self):
+        """双合 = 相邻两柱天干相合且地支亦合。"""
+        chart = _make_chart(2002, 7, 21, 3, 45, "乾造 (Male)")
+        xc = chart["xingchong"]
+        assert xc["双合"] == ["年月双合(天干地支皆合)"]
+        # 前提确实同时成立
+        assert any("年月干合" in h for h in xc["干合"])
+        assert any("年月六合" in h for h in xc["合"])
+
+    @pytest.mark.parametrize(
+        "year,month,day,hour,minute,gender,label",
+        TEST_CASES,
+        ids=[tc[-1] for tc in TEST_CASES],
+    )
+    def test_xingchong_always_has_gan_keys(
+        self, year, month, day, hour, minute, gender, label
+    ):
+        """新增字段必须对所有命盘都存在，下游才能无条件读取。"""
+        chart = _make_chart(year, month, day, hour, minute, gender)
+        for k in ("干合", "干克", "双合"):
+            assert k in chart["xingchong"], f"{label} 缺少 {k}"
+            assert isinstance(chart["xingchong"][k], list)
+
     # -- explain_shensha --
 
     def test_every_emitted_shensha_is_explainable(self):

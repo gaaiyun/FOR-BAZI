@@ -16,6 +16,35 @@ export interface XingChong {
   三合: string[];
   三会: string[];
   半三合: string[];
+  /** 天干五合（含化神）。此前整块漏算，与参天 bazi-MCP 交叉核验时才暴露。 */
+  干合: string[];
+  干克: string[];
+  /** 相邻两柱天干相合且地支亦合 */
+  双合: string[];
+}
+
+/** 天干五合及其化神 */
+const GAN_5HE: Array<[string, string, string]> = [
+  ["甲", "己", "土"],
+  ["乙", "庚", "金"],
+  ["丙", "辛", "水"],
+  ["丁", "壬", "木"],
+  ["戊", "癸", "火"],
+];
+
+const GAN_ELEMENT: Record<string, string> = {
+  甲: "木", 乙: "木", 丙: "火", 丁: "火", 戊: "土",
+  己: "土", 庚: "金", 辛: "金", 壬: "水", 癸: "水",
+};
+const ELEMENT_KE: Record<string, string> = {
+  木: "土", 土: "水", 水: "火", 火: "金", 金: "木",
+};
+
+function heHuaOf(a: string, b: string): string | null {
+  for (const [x, y, hua] of GAN_5HE) {
+    if ((a === x && b === y) || (a === y && b === x)) return hua;
+  }
+  return null;
 }
 
 const ZHI_3HE: Record<string, string> = {
@@ -32,7 +61,10 @@ const ZHI_HALF_3HE: Array<[string, string]> = [
 ];
 
 function emptyResult(): XingChong {
-  return { 冲: [], 合: [], 刑: [], 害: [], 破: [], 穿: [], 三合: [], 三会: [], 半三合: [] };
+  return {
+    冲: [], 合: [], 刑: [], 害: [], 破: [], 穿: [],
+    三合: [], 三会: [], 半三合: [], 干合: [], 干克: [], 双合: [],
+  };
 }
 
 export function calculateXingChongHeHai(pillars: string[]): XingChong {
@@ -85,6 +117,40 @@ export function calculateXingChongHeHai(pillars: string[]): XingChong {
   if (zhiSet.has("子") && zhiSet.has("卯")) r.刑.push("子卯相刑(无礼之刑)");
   for (const z of ["辰", "午", "酉", "亥"]) {
     if (zhi.filter((x) => x === z).length >= 2) r.刑.push(`${z}自刑`);
+  }
+
+  // ── 天干五合与相克 ──
+  // 只判相邻两柱：传统上天干合克讲究紧贴，隔柱作用力大减。
+  const gan = pillars.map((p) => (p ? p[0] : ""));
+  for (let i = 0; i < gan.length - 1; i++) {
+    const a = gan[i];
+    const b = gan[i + 1];
+    if (!a || !b) continue;
+    const tag = `${labels[i]}${labels[i + 1]}`;
+
+    const hua = a !== b ? heHuaOf(a, b) : null;
+    if (hua) {
+      r.干合.push(`${tag}干合(${a}${b}合${hua})`);
+      // 「贪合忘克」：既合则不再以克论，否则同一对关系被算两笔。
+      continue;
+    }
+    const ea = GAN_ELEMENT[a];
+    const eb = GAN_ELEMENT[b];
+    if (ea && eb) {
+      if (ELEMENT_KE[ea] === eb) r.干克.push(`${tag}干克(${a}克${b})`);
+      else if (ELEMENT_KE[eb] === ea) r.干克.push(`${tag}干克(${b}克${a})`);
+    }
+  }
+
+  // 双合：相邻两柱天干相合且地支亦合
+  for (let i = 0; i < 3; i++) {
+    const tag = `${labels[i]}${labels[i + 1]}`;
+    if (
+      r.干合.some((h) => h.startsWith(`${tag}干合`)) &&
+      r.合.some((h) => h.startsWith(`${tag}六合`))
+    ) {
+      r.双合.push(`${tag}双合(天干地支皆合)`);
+    }
   }
 
   return r;
