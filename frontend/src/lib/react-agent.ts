@@ -37,7 +37,10 @@ export interface GatewayConfig {
   model?: string;
 }
 
-const MAX_STEPS = 8;
+/** 一次完整解读可能要连查十几个工具，8 轮不够 */
+const MAX_STEPS = 14;
+/** 单轮输出上限。推理模型的 reasoning 也吃这个预算，给足才不会半路截断。 */
+const MAX_TOKENS = 8192;
 
 /** 从模型答复里抓「某年 + 干支」的搭配，收尾时反查历法。 */
 const GANZHI_RE =
@@ -57,11 +60,30 @@ async function runFactCheck(text: string): Promise<Array<Record<string, unknown>
   return results;
 }
 
+interface GatewayTurn {
+  content: string;
+  toolCalls: Array<{ id: string; type: string; function: { name: string; arguments: string } }>;
+  finishReason: string;
+}
+
+/**
+ * 调用网关并解析 SSE 流。
+ *
+ * 必须走流式：非流式请求在生成较长内容时会被上游断连
+ * （实测 max_tokens ≥ 4096 即 RemoteDisconnected）。而且 GLM-4.7-flash 是
+ * 推理模型，reasoning 内容同样消耗 max_tokens——2048 的预算里可见正文
+ * 只剩几百字，`finish_reason` 会是 "length"，解读到一半就断。
+ *
+ * @param onDelta 每个正文增量片段的回调，供 UI 实时渲染
+ */
 async function callGateway(
   cfg: GatewayConfig,
   messages: ChatMsg[],
-  signal?: AbortSignal
-): Promise<Record<string, unknown>> {
+  onDelta: (text: string) => void,
+  signal?: AbortSignal,
+  /** 收尾轮传 false：只要结论，不再给工具 */
+  withTools = true
+): Promise<GatewayTurn> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (cfg.providerKey && cfg.providerBaseUrl) {
     headers["X-Provider-Key"] = cfg.providerKey;
@@ -78,19 +100,79 @@ async function callGateway(
     body: JSON.stringify({
       model: cfg.model,
       messages,
-      tools: TOOL_SCHEMAS,
-      tool_choice: "auto",
-      max_tokens: 2048,
+      ...(withTools ? { tools: TOOL_SCHEMAS, tool_choice: "auto" } : {}),
+      stream: true,
+      max_tokens: MAX_TOKENS,
     }),
   });
 
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const d = data as Record<string, unknown>;
+  if (!res.ok || !res.body) {
+    const d = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     const detail = [d.error, d.detail].filter(Boolean).join(" ");
     throw new Error(detail || `网关返回 ${res.status}`);
   }
-  return data as Record<string, unknown>;
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let content = "";
+  let finishReason = "";
+  // 工具调用的参数在流里是分片到达的，按 index 累积
+  const toolAcc = new Map<number, { id: string; name: string; args: string }>();
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // SSE 帧以空行分隔；先归一化 CRLF，最后一段可能不完整，留在缓冲区
+    const parts = buffer.replace(/\r\n/g, "\n").split("\n\n");
+    buffer = parts.pop() ?? "";
+
+    for (const part of parts) {
+      for (const line of part.split("\n")) {
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        let d: Record<string, unknown>;
+        try {
+          d = JSON.parse(payload);
+        } catch {
+          continue;
+        }
+        const ch = ((d.choices as unknown[]) ?? [])[0] as Record<string, unknown> | undefined;
+        if (!ch) continue;
+        if (ch.finish_reason) finishReason = String(ch.finish_reason);
+
+        const delta = (ch.delta ?? {}) as Record<string, unknown>;
+        if (typeof delta.content === "string" && delta.content) {
+          content += delta.content;
+          onDelta(delta.content);
+        }
+        const tcs = delta.tool_calls as Array<Record<string, unknown>> | undefined;
+        if (tcs) {
+          for (const tc of tcs) {
+            const idx = Number(tc.index ?? 0);
+            const cur = toolAcc.get(idx) ?? { id: "", name: "", args: "" };
+            if (tc.id) cur.id = String(tc.id);
+            const fn = (tc.function ?? {}) as Record<string, unknown>;
+            if (fn.name) cur.name = String(fn.name);
+            if (typeof fn.arguments === "string") cur.args += fn.arguments;
+            toolAcc.set(idx, cur);
+          }
+        }
+      }
+    }
+  }
+
+  const toolCalls = [...toolAcc.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, v]) => ({
+      id: v.id || `tc_${v.name}`,
+      type: "function",
+      function: { name: v.name, arguments: v.args || "{}" },
+    }));
+
+  return { content, toolCalls, finishReason };
 }
 
 /**
@@ -123,35 +205,37 @@ export async function* runReactLoop(
   working.push({ role: "user", content: message });
 
   let finalContent = "";
+  let truncated = false;
 
   for (let step = 0; step < MAX_STEPS; step++) {
-    let data: Record<string, unknown>;
+    let turn: GatewayTurn;
+    // 正文增量直接转成 token 事件，UI 得以逐字显示
+    const emitted: string[] = [];
     try {
-      data = await callGateway(gateway, working, signal);
+      turn = await callGateway(gateway, working, (d) => emitted.push(d), signal);
     } catch (err) {
       if (signal?.aborted) return;
       yield { type: "error", payload: { message: err instanceof Error ? err.message : String(err) } };
       return;
     }
+    for (const d of emitted) yield { type: "token", payload: { content: d } };
 
-    const choice = ((data.choices as unknown[]) ?? [])[0] as Record<string, unknown> | undefined;
-    const msg = (choice?.message ?? {}) as Record<string, unknown>;
-    const toolCalls = (msg.tool_calls ?? []) as Array<{
-      id: string; type: string; function: { name: string; arguments: string };
-    }>;
-    const content = typeof msg.content === "string" ? msg.content : "";
+    if (!turn.toolCalls.length) {
+      finalContent = turn.content.trim() || "天机不可泄露。";
 
-    if (!toolCalls.length) {
-      finalContent = content.trim() || "天机不可泄露。";
-      // 一次性把最终答复作为 token 吐出：网关这条路径是非流式的，
-      // 但事件协议保持一致，UI 无需区分。
-      yield { type: "token", payload: { content: finalContent } };
+      // 被 max_tokens 截断时明确告知，而不是把半截解读当成完整结果交出去。
+      if (turn.finishReason === "length") {
+        truncated = true;
+        const note = "\n\n---\n\n> ⚠️ 本次输出达到长度上限被截断，以上解读并不完整。可以点「重新分析」再试，或就某一节单独提问。";
+        finalContent += note;
+        yield { type: "token", payload: { content: note } };
+      }
       break;
     }
 
-    working.push({ role: "assistant", content: content || "", tool_calls: toolCalls });
+    working.push({ role: "assistant", content: turn.content || "", tool_calls: turn.toolCalls });
 
-    for (const tc of toolCalls) {
+    for (const tc of turn.toolCalls) {
       const name = tc.function?.name ?? "";
       const rawArgs = tc.function?.arguments || "{}";
       let args: Record<string, unknown> = {};
@@ -187,6 +271,41 @@ export async function* runReactLoop(
     }
   }
 
+  // 步数耗尽而模型仍在调工具时，若不做收尾就只剩一堆中间过程、没有结论。
+  // 这里强制再要一次不带工具的答复，保证一定有可读的最终解读。
+  if (!finalContent) {
+    yield { type: "status", payload: { message: "正在汇总…" } };
+    working.push({
+      role: "user",
+      content: "工具查询到此为止。请基于以上全部工具结果，给出完整的最终解读，不要再调用工具。",
+    });
+    const wrapDeltas: string[] = [];
+    try {
+      const wrap = await callGateway(
+        gateway,
+        working,
+        (d) => wrapDeltas.push(d),
+        signal,
+        /* withTools */ false
+      );
+      for (const d of wrapDeltas) yield { type: "token", payload: { content: d } };
+      finalContent = wrap.content.trim() || "天机不可泄露。";
+      if (wrap.finishReason === "length") {
+        truncated = true;
+        const note = "\n\n---\n\n> ⚠️ 本次输出达到长度上限被截断，以上解读并不完整。";
+        finalContent += note;
+        yield { type: "token", payload: { content: note } };
+      }
+    } catch (err) {
+      if (signal?.aborted) return;
+      yield {
+        type: "error",
+        payload: { message: err instanceof Error ? err.message : String(err) },
+      };
+      return;
+    }
+  }
+
   const factChecks = finalContent ? await runFactCheck(finalContent) : [];
-  yield { type: "done", payload: { content: finalContent, fact_checks: factChecks } };
+  yield { type: "done", payload: { content: finalContent, fact_checks: factChecks, truncated } };
 }
