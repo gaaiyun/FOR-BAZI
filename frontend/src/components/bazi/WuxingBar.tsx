@@ -1,110 +1,100 @@
 /**
- * WuxingBar -- ECharts horizontal bar chart for Five Elements power percentages.
- * Each bar is colored according to the element's traditional color.
- * Uses useMemo for options to avoid unnecessary re-renders.
+ * 五行力量条。
+ *
+ * 只有五个固定条目，用 ECharts 是杀鸡用牛刀：多带 1MB 依赖、样式受默认主题
+ * 牵制、还要和页面其余部分对齐字体与间距。改成自绘后更轻，也能把日主、
+ * 最旺、最弱这些语义直接标在条上——图表库做不到这种贴合。
  */
 
 import { useMemo } from "react";
-import ReactECharts from "echarts-for-react";
-import { withTheme } from "@/lib/chart-theme";
 import { ELEMENT_COLORS } from "@/lib/wuxing-colors";
-import type { WuxingPower } from "@/types/bazi";
-
-// ── Props ─────────────────────────────────────────────────────────
+import type { WuxingPower, ElementBalance } from "@/types/bazi";
 
 export interface WuxingBarProps {
-  /** Wuxing power scores for each element. */
-  wuxingPower: WuxingPower;
-  /** Optional height for the chart container. Defaults to 300px. */
-  height?: number;
+  /** 接受加权力量或计数两种来源 */
+  wuxingPower: WuxingPower | ElementBalance | Record<string, number>;
+  /** 日主五行，会额外标注 */
+  dayMasterElement?: string;
 }
 
-// ── Constants ─────────────────────────────────────────────────────
-
 const ELEMENTS = ["金", "木", "水", "火", "土"] as const;
+const EN: Record<string, string> = {
+  金: "Metal", 木: "Wood", 水: "Water", 火: "Fire", 土: "Earth",
+};
 
-// ── Component ─────────────────────────────────────────────────────
+function colorOf(el: string): string {
+  return ELEMENT_COLORS[el] ?? "var(--muted-foreground)";
+}
 
-export default function WuxingBar({ wuxingPower, height = 300 }: WuxingBarProps) {
-  const option = useMemo(() => {
-    const values = ELEMENTS.map((el) => wuxingPower[el] ?? 0);
-    const maxVal = Math.max(...values, 1);
-
-    return {
-      backgroundColor: "transparent",
-      tooltip: {
-        trigger: "axis" as const,
-        axisPointer: { type: "shadow" as const },
-        backgroundColor: "#161b22",
-        borderColor: "#30363d",
-        textStyle: { color: "#e6edf3" },
-        formatter: (params: unknown) => {
-          const item = Array.isArray(params) ? params[0] : null;
-          if (!item || typeof item !== "object") return "";
-          const p = item as { name: string; value: number };
-          const total = values.reduce((a, b) => a + b, 0) || 1;
-          const pct = ((p.value / total) * 100).toFixed(1);
-          return `${p.name}: ${p.value} (${pct}%)`;
-        },
-      },
-      grid: {
-        left: 48,
-        right: 60,
-        top: 12,
-        bottom: 12,
-        containLabel: false,
-      },
-      xAxis: {
-        type: "value" as const,
-        max: Math.ceil(maxVal * 1.15),
-        axisLabel: { color: "#8b949e" },
-        splitLine: { lineStyle: { color: "#30363d", type: "dashed" as const } },
-        axisLine: { show: false },
-      },
-      yAxis: {
-        type: "category" as const,
-        data: [...ELEMENTS],
-        axisLabel: {
-          color: "#e6edf3",
-          fontSize: 14,
-          fontWeight: 600,
-        },
-        axisLine: { show: false },
-        axisTick: { show: false },
-      },
-      series: [
-        {
-          type: "bar" as const,
-          data: ELEMENTS.map((el) => ({
-            value: wuxingPower[el] ?? 0,
-            itemStyle: {
-              color: ELEMENT_COLORS[el],
-              borderRadius: [0, 4, 4, 0],
-            },
-          })),
-          barWidth: 24,
-          label: {
-            show: true,
-            position: "right" as const,
-            color: "#e6edf3",
-            fontSize: 12,
-            formatter: (params: { value: number }) => {
-              const total = values.reduce((a, b) => a + b, 0) || 1;
-              const pct = ((params.value / total) * 100).toFixed(1);
-              return `${params.value} (${pct}%)`;
-            },
-          },
-        },
-      ],
-    };
-  }, [wuxingPower]);
+export default function WuxingBar({ wuxingPower, dayMasterElement }: WuxingBarProps) {
+  const rows = useMemo(() => {
+    const src = wuxingPower as unknown as Record<string, number>;
+    const vals = ELEMENTS.map((el) => src[el] ?? 0);
+    const max = Math.max(...vals, 1);
+    const strongest = ELEMENTS[vals.indexOf(Math.max(...vals))];
+    const weakest = ELEMENTS[vals.indexOf(Math.min(...vals))];
+    return ELEMENTS.map((el, i) => ({
+      el,
+      value: vals[i],
+      pct: (vals[i] / max) * 100,
+      isStrongest: el === strongest,
+      isWeakest: el === weakest,
+      isDayMaster: el === dayMasterElement,
+    }));
+  }, [wuxingPower, dayMasterElement]);
 
   return (
-    <ReactECharts
-      option={withTheme(option)}
-      style={{ height, width: "100%" }}
-      opts={{ renderer: "canvas" }}
-      notMerge
-    />
+    <ul className="stagger space-y-3">
+      {rows.map((r) => (
+        <li key={r.el} className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+          {/* 五行字 + 英文 */}
+          <div className="flex w-16 items-baseline gap-1.5">
+            <span
+              className="font-heading text-lg font-bold leading-none"
+              style={{ color: colorOf(r.el) }}
+            >
+              {r.el}
+            </span>
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+              {EN[r.el]}
+            </span>
+          </div>
+
+          {/* 力量条 */}
+          <div className="relative h-6 overflow-hidden rounded-md bg-black/25">
+            <div
+              className="h-full rounded-md transition-[width] duration-[var(--dur-slow)] ease-[var(--ease-out-expo)]"
+              style={{
+                width: `${r.pct}%`,
+                background: `linear-gradient(90deg, ${colorOf(r.el)}cc, ${colorOf(r.el)}66)`,
+              }}
+            />
+            {/* 语义标注贴在条内，图表库做不到这种贴合 */}
+            <span className="absolute inset-y-0 right-2 flex items-center gap-1.5">
+              {r.isDayMaster && (
+                <span className="rounded bg-background/70 px-1.5 py-px text-[9px] font-medium text-gold">
+                  日主
+                </span>
+              )}
+              {r.isStrongest && (
+                <span className="rounded bg-background/70 px-1.5 py-px text-[9px] text-muted-foreground">
+                  最旺
+                </span>
+              )}
+              {r.isWeakest && (
+                <span className="rounded bg-background/70 px-1.5 py-px text-[9px] text-muted-foreground">
+                  最弱
+                </span>
+              )}
+            </span>
+          </div>
+
+          {/* 数值 */}
+          <span className="tabular w-14 text-right text-sm font-medium text-foreground">
+            {r.value.toFixed(1)}%
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -1,106 +1,116 @@
 /**
- * WuxingRadar -- ECharts radar chart for the Five Elements (五行) power distribution.
- * Displays a pentagonal radar with one axis per element (金木水火土).
- * Uses useMemo for options to avoid unnecessary re-renders.
+ * 五行雷达。
+ *
+ * 自绘 SVG 而非 ECharts：五个轴固定不变，需要的只是一个五边形和一条折线，
+ * 但要让每个顶点用自己的五行色、并在中心标出日主——这些是默认雷达图做不到的。
+ * 轴序按传统方位（金水木火土顺时针相生），而不是图表库的默认顺序。
  */
 
 import { useMemo } from "react";
-import ReactECharts from "echarts-for-react";
-import { withTheme } from "@/lib/chart-theme";
 import { ELEMENT_COLORS } from "@/lib/wuxing-colors";
-import type { WuxingPower } from "@/types/bazi";
-
-// ── Props ─────────────────────────────────────────────────────────
+import type { WuxingPower, ElementBalance } from "@/types/bazi";
 
 export interface WuxingRadarProps {
-  /** Wuxing power scores for each element. */
-  wuxingPower: WuxingPower;
-  /** Optional height for the chart container. Defaults to 360px. */
-  height?: number;
+  /** 接受加权力量或计数两种来源 */
+  wuxingPower: WuxingPower | ElementBalance | Record<string, number>;
+  /** 日主五行，标在中心 */
+  dayMasterElement?: string;
 }
 
-// ── Constants ─────────────────────────────────────────────────────
+/** 金 → 水 → 木 → 火 → 土 顺时针，即五行相生的次序 */
+const AXES = ["金", "水", "木", "火", "土"] as const;
 
-const ELEMENTS = ["金", "木", "水", "火", "土"] as const;
+const SIZE = 240;
+const CX = SIZE / 2;
+const CY = SIZE / 2;
+const R = 78;
 
-// ── Component ─────────────────────────────────────────────────────
+function pointAt(i: number, ratio: number): [number, number] {
+  const angle = (Math.PI * 2 * i) / AXES.length - Math.PI / 2;
+  return [CX + Math.cos(angle) * R * ratio, CY + Math.sin(angle) * R * ratio];
+}
 
-export default function WuxingRadar({ wuxingPower, height = 360 }: WuxingRadarProps) {
-  const option = useMemo(() => {
-    const values = ELEMENTS.map((el) => wuxingPower[el] ?? 0);
-    const maxVal = Math.max(...values, 1) * 1.2;
+function colorOf(el: string): string {
+  return ELEMENT_COLORS[el] ?? "var(--muted-foreground)";
+}
 
-    return {
-      backgroundColor: "transparent",
-      tooltip: {
-        trigger: "item" as const,
-        backgroundColor: "#161b22",
-        borderColor: "#30363d",
-        textStyle: { color: "#e6edf3" },
-        formatter: (params: { value: number[] }) => {
-          if (!params.value) return "";
-          const lines = ELEMENTS.map(
-            (el, i) =>
-              `<span style="color:${ELEMENT_COLORS[el]}">●</span> ${el}: ${params.value[i]}`
-          );
-          return lines.join("<br/>");
-        },
-      },
-      radar: {
-        indicator: ELEMENTS.map((el) => ({
-          name: el,
-          max: maxVal,
-        })),
-        shape: "polygon" as const,
-        splitNumber: 4,
-        axisName: {
-          color: "#e6edf3",
-          fontSize: 14,
-          fontWeight: 600,
-        },
-        splitLine: { lineStyle: { color: "#30363d" } },
-        splitArea: {
-          areaStyle: {
-            color: ["rgba(13,17,23,0.6)", "rgba(28,33,40,0.4)"],
-          },
-        },
-        axisLine: { lineStyle: { color: "#30363d" } },
-      },
-      series: [
-        {
-          type: "radar" as const,
-          data: [
-            {
-              value: values,
-              name: "五行力量",
-              areaStyle: {
-                color: "rgba(212,175,55,0.15)",
-              },
-              lineStyle: {
-                color: "#d4af37",
-                width: 2,
-              },
-              itemStyle: {
-                color: "#d4af37",
-              },
-              symbol: "circle",
-              symbolSize: 6,
-            },
-          ],
-          emphasis: {
-            lineStyle: { width: 3 },
-          },
-        },
-      ],
-    };
+export default function WuxingRadar({ wuxingPower, dayMasterElement }: WuxingRadarProps) {
+  const { polygon, vertices, max } = useMemo(() => {
+    const get = (el: string) => (wuxingPower as unknown as Record<string, number>)[el] ?? 0;
+    const vals = AXES.map(get);
+    const m = Math.max(...vals, 1);
+    const vs = AXES.map((el, i) => {
+      const [x, y] = pointAt(i, Math.max(get(el) / m, 0.02));
+      const [lx, ly] = pointAt(i, 1.26);
+      return { el, value: get(el), x, y, lx, ly };
+    });
+    return { max: m, vertices: vs, polygon: vs.map((v) => `${v.x},${v.y}`).join(" ") };
   }, [wuxingPower]);
 
   return (
-    <ReactECharts
-      option={withTheme(option)}
-      style={{ height, width: "100%" }}
-      opts={{ renderer: "canvas" }}
-      notMerge
-    />
+    <div className="flex items-center justify-center">
+      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="h-[240px] w-[240px]" role="img">
+        <title>{`五行力量雷达，最高 ${max.toFixed(1)}%`}</title>
+
+        {/* 同心网格 */}
+        {[0.25, 0.5, 0.75, 1].map((r) => (
+          <polygon
+            key={r}
+            points={AXES.map((_, i) => pointAt(i, r).join(",")).join(" ")}
+            fill="none"
+            stroke="var(--border)"
+            strokeWidth={0.8}
+            opacity={r === 1 ? 0.7 : 0.28}
+          />
+        ))}
+
+        {/* 轴线 */}
+        {AXES.map((_, i) => {
+          const [x, y] = pointAt(i, 1);
+          return (
+            <line key={i} x1={CX} y1={CY} x2={x} y2={y}
+              stroke="var(--border)" strokeWidth={0.8} opacity={0.32} />
+          );
+        })}
+
+        {/* 数据多边形 */}
+        <polygon
+          points={polygon}
+          fill="rgb(212 175 55 / 0.13)"
+          stroke="var(--primary)"
+          strokeWidth={1.6}
+          strokeLinejoin="round"
+        />
+
+        {/* 顶点各用自己的五行色 */}
+        {vertices.map((v) => (
+          <circle key={v.el} cx={v.x} cy={v.y} r={3.4}
+            fill={colorOf(v.el)} stroke="var(--background)" strokeWidth={1.2} />
+        ))}
+
+        {/* 轴标签：五行字 + 数值 */}
+        {vertices.map((v) => (
+          <g key={`l-${v.el}`}>
+            <text x={v.lx} y={v.ly - 3} textAnchor="middle" dominantBaseline="middle"
+              fontSize={14} fontWeight="bold" fill={colorOf(v.el)}
+              style={{ fontFamily: "'Noto Serif SC', serif" }}>
+              {v.el}
+            </text>
+            <text x={v.lx} y={v.ly + 10} textAnchor="middle" dominantBaseline="middle"
+              fontSize={9} fill="var(--muted-foreground)"
+              style={{ fontVariantNumeric: "tabular-nums" }}>
+              {v.value.toFixed(1)}
+            </text>
+          </g>
+        ))}
+
+        {dayMasterElement && (
+          <text x={CX} y={CY} textAnchor="middle" dominantBaseline="middle"
+            fontSize={10} fill="var(--muted-foreground)">
+            日主 {dayMasterElement}
+          </text>
+        )}
+      </svg>
+    </div>
   );
 }

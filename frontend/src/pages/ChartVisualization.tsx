@@ -5,6 +5,7 @@
  */
 
 import { useState, useMemo, useEffect } from "react";
+import { Section } from "@/components/layout/Page";
 import { useNavigate } from "react-router-dom";
 import { useBaziStore } from "@/stores/useBaziStore";
 import FourPillarGrid from "@/components/bazi/FourPillarGrid";
@@ -136,26 +137,12 @@ export default function ChartVisualization() {
 
       {/* ── Wuxing Charts ─────────────────────────────────────── */}
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="border border-border bg-card/60 backdrop-blur-md">
-          <CardHeader className="pb-0">
-            <CardTitle className="text-sm text-muted-foreground">
-              五行力量雷达
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <WuxingRadar wuxingPower={wuxingPower} height={280} />
-          </CardContent>
-        </Card>
-        <Card className="border border-border bg-card/60 backdrop-blur-md">
-          <CardHeader className="pb-0">
-            <CardTitle className="text-sm text-muted-foreground">
-              五行力量柱状
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <WuxingBar wuxingPower={wuxingPower} height={280} />
-          </CardContent>
-        </Card>
+        <Section title="五行力量雷达">
+            <WuxingRadar wuxingPower={wuxingPower} dayMasterElement={reading.chart.day_master_element} />
+          </Section>
+        <Section title="五行力量柱状">
+            <WuxingBar wuxingPower={wuxingPower} dayMasterElement={reading.chart.day_master_element} />
+          </Section>
       </div>
 
       {/* ── Tabbed Detail Sections ────────────────────────────── */}
@@ -168,13 +155,7 @@ export default function ChartVisualization() {
 
         {/* Tab 1: Dayun / Annual Pillars */}
         <TabsContent value="dayun" className="mt-4 space-y-4">
-          <Card className="border border-border bg-card/60 backdrop-blur-md">
-            <CardHeader className="pb-0">
-              <CardTitle className="text-sm text-muted-foreground">
-                大运流年
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Section title="大运流年">
               {dayunEntries.length > 0 ? (
                 <DayunTimeline dayun={dayunEntries} />
               ) : (
@@ -182,8 +163,7 @@ export default function ChartVisualization() {
                   暂无大运数据
                 </p>
               )}
-            </CardContent>
-          </Card>
+            </Section>
 
           {/* Dayun list table */}
           {dayunEntries.length > 0 && (
@@ -245,13 +225,7 @@ export default function ChartVisualization() {
 
           {/* Annual pillars preview */}
           {reading.annual_pillars?.length > 0 && (
-            <Card className="border border-border bg-card/60 backdrop-blur-md">
-              <CardHeader className="pb-0">
-                <CardTitle className="text-sm text-muted-foreground">
-                  近年流年
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            <Section title="近年流年">
                 <div className="flex flex-wrap gap-2">
                   {reading.annual_pillars.slice(0, 12).map((ap, i) => (
                     <div
@@ -268,8 +242,7 @@ export default function ChartVisualization() {
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </Section>
           )}
         </TabsContent>
 
@@ -333,13 +306,7 @@ export default function ChartVisualization() {
 
           {/* ShenSha list */}
           {reading.all_shensha && reading.all_shensha.length > 0 && (
-            <Card className="border border-border bg-card/60 backdrop-blur-md">
-              <CardHeader className="pb-0">
-                <CardTitle className="text-sm text-muted-foreground">
-                  神煞一览
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            <Section title="神煞一览">
                 {/* 只渲染真正有神煞的柱：空柱此前也画成带绿点的整行，
                     看起来像有内容，实际是空的。 */}
                 {(() => {
@@ -372,19 +339,12 @@ export default function ChartVisualization() {
                     </ul>
                   );
                 })()}
-              </CardContent>
-            </Card>
+              </Section>
           )}
 
           {/* XingChong */}
           {reading.xingchong && reading.xingchong.length > 0 && (
-            <Card className="border border-border bg-card/60 backdrop-blur-md">
-              <CardHeader className="pb-0">
-                <CardTitle className="text-sm text-muted-foreground">
-                  刑冲合害
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            <Section title="刑冲合害">
                 <div className="flex flex-wrap gap-2">
                   {reading.xingchong.map((xc, i) => (
                     <Badge
@@ -396,20 +356,13 @@ export default function ChartVisualization() {
                     </Badge>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </Section>
           )}
         </TabsContent>
 
         {/* Tab 3: Wuxing detail breakdown */}
         <TabsContent value="wuxing" className="mt-4 space-y-4">
-          <Card className="border border-border bg-card/60 backdrop-blur-md">
-            <CardHeader className="pb-0">
-              <CardTitle className="text-sm text-muted-foreground">
-                五行精算
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Section title="五行精算">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -487,18 +440,11 @@ export default function ChartVisualization() {
                   </tbody>
                 </table>
               </div>
-            </CardContent>
-          </Card>
+            </Section>
 
           {/* Ten gods overview */}
           {reading.ten_gods?.length > 0 && (
-            <Card className="border border-border bg-card/60 backdrop-blur-md">
-              <CardHeader className="pb-0">
-                <CardTitle className="text-sm text-muted-foreground">
-                  十神一览
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            <Section title="十神一览">
                 <div className="flex flex-wrap gap-2">
                   {reading.ten_gods.map((tg, i) => (
                     <div
@@ -530,19 +476,12 @@ export default function ChartVisualization() {
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </Section>
           )}
 
           {/* Favorable / Unfavorable summary */}
           <div className="grid gap-4 md:grid-cols-2">
-            <Card className="border border-border bg-card/60 backdrop-blur-md">
-              <CardHeader className="pb-0">
-                <CardTitle className="text-sm text-jade">
-                  喜用神
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            <Section title="喜用神">
                 <div className="flex flex-wrap gap-2">
                   {(reading.favorable_elements ?? []).map((el, i) => (
                     <Badge
@@ -562,13 +501,8 @@ export default function ChartVisualization() {
                     <span className="text-xs text-muted-foreground">暂无数据</span>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-            <Card className="border border-border bg-card/60 backdrop-blur-md">
-              <CardHeader className="pb-0">
-                <CardTitle className="text-sm text-crimson">忌神</CardTitle>
-              </CardHeader>
-              <CardContent>
+              </Section>
+            <Section title="忌神">
                 <div className="flex flex-wrap gap-2">
                   {(reading.unfavorable_elements ?? []).map((el, i) => (
                     <Badge
@@ -588,24 +522,16 @@ export default function ChartVisualization() {
                     <span className="text-xs text-muted-foreground">暂无数据</span>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </Section>
           </div>
 
           {/* Summary */}
           {reading.summary && (
-            <Card className="border border-border bg-card/60 backdrop-blur-md">
-              <CardHeader className="pb-0">
-                <CardTitle className="text-sm text-gold">
-                  命理总论
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            <Section title="命理总论">
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
                   {reading.summary}
                 </p>
-              </CardContent>
-            </Card>
+              </Section>
           )}
         </TabsContent>
       </Tabs>

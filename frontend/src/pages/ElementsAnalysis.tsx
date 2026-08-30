@@ -171,11 +171,11 @@ export default function ElementsAnalysis() {
       {/* ── Charts Row ──────────────────────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title="五行雷达图" description="五行力量分布总览">
-            <WuxingRadar wuxingPower={raw} height={340} />
+            <WuxingRadar wuxingPower={raw} dayMasterElement={reading.chart.day_master_element} />
           </Section>
 
         <Section title="五行力量柱状图" description="各元素力量百分比">
-            <WuxingBar wuxingPower={raw} height={340} />
+            <WuxingBar wuxingPower={raw} dayMasterElement={reading.chart.day_master_element} />
           </Section>
       </div>
 
