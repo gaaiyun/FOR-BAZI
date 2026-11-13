@@ -1,66 +1,66 @@
 # FOR-BAZI 架构文档
 
-> 系统架构、模块职责、数据流详细说明
+> 系统架构、模块职责、数据流。第 3–6、9 节描述的是 Python 后端（桌面版与 MCP 使用）。
 
 ---
 
 ## 1. 总体架构
 
+网页版的计算全部在浏览器里完成：排盘引擎、14 个 Agent 工具、5 本古籍的检索都打包进前端，
+只有模型补全经过一个同源的 Pages Function 网关。Python 部分保留为对拍基准，
+并服务桌面版、MCP 服务器和 Streamlit 旧版。
+
 ```mermaid
 graph TB
-    subgraph Client["客户端层"]
-        direction LR
-        Tauri["Tauri v2 Desktop<br/>Rust Shell + WebView2"]
-        Web["Web Browser<br/>localhost:5173"]
-        Streamlit["Streamlit<br/>localhost:8501<br/>(Legacy)"]
-    end
-
-    subgraph Frontend["React 前端"]
+    subgraph Browser["浏览器"]
         direction TB
-        Pages["10 Pages<br/>Lazy-loaded Routes"]
-        Components["UI Components<br/>bazi · chat · layout · ui"]
-        Stores["Zustand Stores<br/>bazi · chat · settings"]
-        Adapter["response-adapter.ts<br/>Backend → Frontend 格式转换"]
-        APIClient["api.ts<br/>Axios + SSE Client"]
+        Pages["10 个页面<br/>按路由懒加载"]
+        View["lib/chart-view.ts<br/>展示模型（十神、大运、流年、十神分布）"]
+        Text["lib/chart-text.ts<br/>复制给 AI 的文本"]
+        Birth["lib/solar-time.ts<br/>农历 · 真太阳时 · 夏令时"]
+        TSEngine["src/engine/<br/>四柱 · 神煞 · 五行 · 格局 · 刑冲"]
+        Agent["lib/react-agent.ts<br/>ReAct 循环 + 14 个工具"]
+        Books["古籍 JSON<br/>按需加载"]
+        Store["Zustand + localStorage<br/>命盘历史 · 对话 · 解读存档 · 设置"]
+        Pages --> View --> TSEngine
+        Pages --> Text --> View
+        Pages --> Birth --> TSEngine
+        Pages --> Agent --> TSEngine
+        Agent --> Books
+        Pages --> Store
     end
 
-    subgraph Server["FastAPI 服务层"]
-        direction TB
-        Router["5 API Routes<br/>chart · chat · texts · compat · entertain"]
-        Schemas["Pydantic Schemas<br/>请求/响应验证"]
-        Services["3 Services<br/>bazi · agent · text"]
-        Normalize["_normalize_chart_data()<br/>前端格式 → 引擎格式"]
+    subgraph Edge["Cloudflare Pages Function"]
+        GW["/api/chat · /api/quota<br/>匿名限次（KV）· 访问密钥 · 转发自带 Key"]
     end
 
-    subgraph Core["Python 核心引擎"]
-        direction TB
-        Engine["bazi_engine.py<br/>lunar-python 四柱计算"]
-        Shensha["shensha.py<br/>20+ 神煞判定"]
-        Tools["14 Tools<br/>bazi_tools · wuxing · geju"]
-        AgentCore["ReAct Agent<br/>react_agent · api_adapter"]
+    subgraph Models["模型"]
+        WAI["Workers AI（默认免费）"]
+        BYO["自带服务商<br/>OpenAI · Anthropic · DeepSeek · 百炼 · MiMo"]
     end
 
-    subgraph DataStore["数据层"]
-        direction TB
-        Texts["5 JSON Files<br/>穷通宝鉴 · 滴天髓 · 子平真诠<br/>三命通会 · 渊海子平"]
-        Chroma["ChromaDB<br/>sentence-transformers<br/>向量索引"]
+    Agent -->|SSE| GW
+    GW --> WAI
+    GW --> BYO
+
+    subgraph Python["Python（对拍基准 / 桌面版 / MCP）"]
+        PyEngine["engine/ · tools/<br/>与 TS 引擎逐字段一致"]
+        Backend["backend/ FastAPI"]
+        MCP["mcp_server/"]
+        Backend --> PyEngine
+        MCP --> PyEngine
     end
 
-    subgraph LLM["大模型 API"]
-        OpenAI["OpenAI / DeepSeek<br/>(OpenAI SDK)"]
-        Anthropic["Anthropic / MiMo / GLM<br/>(Anthropic SDK)"]
-    end
-
-    Client --> Frontend
-    Frontend -->|HTTP + SSE| Server
-    Server --> Normalize
-    Normalize --> Core
-    Server --> DataStore
-    Core --> AgentCore
-    AgentCore --> Tools
-    AgentCore --> LLM
-    Tools --> DataStore
+    PyEngine -. "scripts/gen_golden_fixtures.py<br/>导出 18 个边界命例" .-> TSEngine
 ```
+
+### 引擎为什么有两份
+
+排盘移到浏览器之后，站点可以纯静态部署，用户的出生信息也不再离开设备。代价是要维护两份实现。
+约束办法是对拍：`scripts/gen_golden_fixtures.py` 从 Python 引擎导出 18 个边界命例
+（立春交节、晚子时跨日、除夕、闰年、大运顺逆、从格边界等）的全部字段，
+`frontend/src/engine/parity.test.ts` 要求 TS 引擎逐字段相等，包括同柱多个神煞的先后顺序。
+改任何一边的规则，都要两边一起改，再重新导出基准。
 
 ---
 
@@ -68,101 +68,73 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph Router["React Router v7"]
-        R1["/ → BaziCalculator"]
-        R2["/chart → ChartVisualization"]
-        R3["/luck → LuckPillars"]
-        R4["/elements → ElementsAnalysis"]
-        R5["/tengods → TenGods"]
-        R6["/shensha → ShenSha"]
-        R7["/annual → AnnualForecast"]
-        R8["/reading → AIReading"]
-        R9["/chat → Chat"]
-        R10["/settings → Settings"]
+    subgraph Routes["路由（全部懒加载）"]
+        R1["/ 排盘"]
+        R2["/chart 命盘"]
+        R3["/luck-pillars 大运"]
+        R4["/annual 流年（?year=）"]
+        R5["/elements 五行"]
+        R6["/ten-gods 十神"]
+        R7["/shensha 神煞"]
+        R8["/ai-reading 解读"]
+        R9["/chat 问事"]
+        R10["/settings 设置"]
     end
 
-    subgraph Layout["Layout"]
-        AppShell["AppShell"]
-        Sidebar["Sidebar<br/>10 Nav Items"]
+    subgraph Shell["layout/"]
+        AppShell["AppShell<br/>宽屏左侧导航 · 手机底部导航 + 「更多」"]
+        Page["Page.tsx<br/>PageHeader · Section · Facts · EmptyState"]
     end
 
-    subgraph State["Zustand Stores"]
-        BaziStore["useBaziStore<br/>reading · input · persist"]
-        ChatStore["useChatStore<br/>messages · persist"]
-        SettingsStore["useSettingsStore<br/>provider · theme · persist"]
+    subgraph Viz["components/bazi/"]
+        PillarTable["PillarTable 四柱表"]
+        Relation["RelationDiagram 干支关系弧线"]
+        Cycle["ElementCycle 五行生克图"]
+        Bars["Bars 细条图"]
+        Dayun["DayunTimeline 大运轨道"]
+        Years["YearGrid · YearDetail 流年"]
+        Copy["CopyChart 复制给 AI"]
     end
 
-    subgraph Components["Components"]
-        BaziComps["bazi/<br/>PillarCard · FourPillarGrid<br/>WuxingRadar · WuxingBar · DayunTimeline"]
-        ChatComps["chat/<br/>ChatPanel · ChatMessage<br/>ChatInput · ToolCallStatus"]
-        UIComps["ui/<br/>13 shadcn/ui components"]
+    subgraph Stores["stores/"]
+        BaziStore["useBaziStore<br/>输入 · 当前命盘 · 历史（20 份）"]
+        ChatStore["useChatStore<br/>消息 · 所属命盘 id"]
+        ReadingStore["useAIReadingStore<br/>按「命盘 + 主题」存解读"]
+        SettingsStore["useSettingsStore<br/>服务商 · 主题"]
     end
 
-    subgraph Lib["Lib"]
-        API["api.ts<br/>calculateBazi · chatStream"]
-        Adapter["response-adapter.ts<br/>adaptChartResponse()"]
-        SSE["useChatSSE.ts<br/>SSE Hook"]
-    end
-
-    Router --> Layout
-    Layout --> Components
-    Components --> State
-    Components --> Lib
-    Lib --> State
+    Routes --> Shell
+    Routes --> Viz
+    Routes --> Stores
 ```
 
-### 数据适配层
-
-前端和后端使用不同的数据格式，`response-adapter.ts` 负责转换：
+### 数据流
 
 ```mermaid
 graph LR
-    subgraph Backend["后端 Flat Format"]
-        B_Pillars["pillars: ['壬午','丁未','庚寅','戊寅']"]
-        B_TG["tg_gan: ['食神','正官','日主','偏印']"]
-        B_TZ["tg_zhi: ['丁己','丁己乙','甲丙戊','甲壬']"]
-        B_Nayin["nayin: ['杨柳木','天河水','松柏木','城头土']"]
-        B_DM["day_master: '庚'"]
-        B_MG["minggong: '甲寅'"]
-    end
-
-    subgraph Adapter["adaptChartResponse()"]
-        Transform["格式转换<br/>flat arrays → nested objects<br/>camelCase 映射"]
-    end
-
-    subgraph Frontend["前端 BaziReading"]
-        F_Chart["chart: {<br/>  year_pillar: {stem:'壬', branch:'午'},<br/>  day_master: '庚'<br/>}"]
-        F_EB["element_balance: {金:1, 木:2, ...}"]
-        F_TG["ten_gods: [{name,character,element}]"]
-        F_DY["dayun: [{ganzhi, start_age, ...}]"]
-        F_MG["ming_gong: '甲寅'"]
-    end
-
-    Backend --> Adapter --> Frontend
+    Input["表单输入<br/>公历/农历 · 出生地"] --> Resolve["resolveBirth()<br/>农历转公历 → 扣夏令时 → 真太阳时"]
+    Resolve --> Calc["calculateChart()<br/>TS 引擎"]
+    Calc --> Adapt["adaptChartResponse()<br/>扁平字段 → BaziReading"]
+    Adapt --> Reading["BaziReading<br/>+ engine_chart 原件<br/>+ birth 换算记录"]
+    Reading --> View["deriveChart()<br/>ChartView"]
+    View --> PagesOut["各页面"]
+    View --> CopyOut["buildChartText()<br/>Markdown / JSON"]
+    Reading --> AgentIn["ReAct 循环<br/>直接用 engine_chart"]
 ```
 
-反向转换在 `agent_service._normalize_chart_data()` 中完成：
+- `BaziReading` 同时带着嵌套结构（页面用）和引擎原件 `engine_chart`（工具用），免去来回转换。
+- 所有派生量（藏干十神、大运十神、虚岁、十神加权分布、原局关系）只在 `deriveChart()` 里算一次，
+  页面和复制文本用的是同一份，口径不会分叉。
+- 外来干支（某步大运、某个流年）与原局的合冲刑害由 `lib/relations.ts` 计算，只报事实，不下吉凶。
 
-```mermaid
-graph LR
-    subgraph Frontend["前端 BaziReading"]
-        F_Chart["chart.year_pillar.stem + branch"]
-        F_Annotations["pillar_annotations.year.ten_god_gan"]
-        F_MG["ming_gong / tai_yuan"]
-    end
+### 视觉约定
 
-    subgraph Normalize["_normalize_chart_data()"]
-        N_Transform["嵌套对象 → 扁平字段<br/>ming_gong → minggong<br/>element_balance → wuxing"]
-    end
-
-    subgraph Engine["引擎 Flat Format"]
-        E_Pillars["pillars: ['壬午','丁未',...]"]
-        E_TG["tg_gan / tg_zhi"]
-        E_MG["minggong / taiyuan"]
-    end
-
-    Frontend --> Normalize --> Engine
-```
+- 不用卡片，靠细线和留白分区；墨色加一种朱砂强调色，昼夜两套主题由 `lib/theme.ts` 切换，
+  `index.html` 里的内联脚本在首帧前定好主题，避免闪烁。
+- 五行色是 CSS 变量（`--wx-wood` 等），昼夜各一套明度。`getCharColor()` 返回的是 `var(...)`，
+  要半透明请用 `tint()`（`color-mix`），不能往后拼十六进制透明度。
+- 字体：思源宋体 400/600 用 fontsource 的分片版，浏览器只下载页面上出现的字所在的分片；
+  干支大字另有一个 29 字的 900 字重子集（`frontend/scripts/subset_glyph_font.py` 生成，约 5 KB）。
 
 ---
 
@@ -425,35 +397,16 @@ classDiagram
 
 ## 7. 测试架构
 
-```mermaid
-graph TB
-    subgraph Tests["452 Tests"]
-        subgraph API["API 层 (72)"]
-            TA1["test_backend_api<br/>17 tests"]
-            TA2["test_api_comprehensive<br/>55 tests"]
-        end
+| 套件 | 数量 | 覆盖 |
+|---|---|---|
+| `frontend` vitest | 380 | TS 与 Python 引擎对拍（18 命例 × 全字段）、复制文本、真太阳时与夏令时、农历与闰月、外来干支关系、神煞释义覆盖 |
+| `tests/` pytest | 506 | 引擎、五行与格局、14 个工具、第二批神煞规则、Agent 服务、API、古籍数据 |
 
-        subgraph Engine["引擎层 (141)"]
-            TE1["test_engine<br/>11 tests"]
-            TE2["test_engine_comprehensive<br/>130 tests"]
-        end
+对拍基准 `tests/fixtures/golden_charts.json` 由 Python 引擎导出。改了 Python 引擎的输出之后：
 
-        subgraph Tools["工具层 (141)"]
-            TT1["test_tools<br/>18 tests"]
-            TT2["test_tools_comprehensive<br/>118 tests"]
-            TT3["test_rag_retrieve<br/>5 tests"]
-        end
-
-        subgraph Service["服务层 (96)"]
-            TS1["test_agent_service<br/>73 tests"]
-            TS2["test_chart_data_adapter<br/>23 tests"]
-        end
-
-        subgraph Data["数据层 (2)"]
-            TD1["test_text_service<br/>3 tests"]
-            TD2["test_scholar_agent<br/>2 tests"]
-        end
-    end
+```bash
+python scripts/gen_golden_fixtures.py tests/fixtures/golden_charts.json
+cd frontend && npm test
 ```
 
 ---
@@ -462,28 +415,30 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph Mode1["模式 1: Web 开发"]
-        Vite["Vite Dev Server<br/>:5173"]
-        Uvicorn1["uvicorn<br/>:8000"]
-        Vite -->|"Proxy /api"| Uvicorn1
+    subgraph Mode1["网页版（推荐）"]
+        PagesStatic["Cloudflare Pages<br/>静态资源"]
+        PagesFn["Pages Function<br/>/api/* 网关"]
+        PagesStatic --- PagesFn
     end
 
-    subgraph Mode2["模式 2: Web 生产"]
-        Browser2["Browser<br/>:8000"]
-        Uvicorn2["uvicorn<br/>:8000"]
-        Uvicorn2 -->|"serve frontend/dist/"| Browser2
+    subgraph Mode2["本地开发"]
+        Vite["Vite :5173"]
+        WranglerDev["wrangler pages dev<br/>（需要站内 AI 时）"]
     end
 
-    subgraph Mode3["模式 3: 桌面应用"]
+    subgraph Mode3["桌面应用"]
         TauriEXE["Tauri EXE<br/>WebView2"]
-        Uvicorn3["uvicorn<br/>:8000"]
-        TauriEXE -->|"HTTP to 127.0.0.1:8000"| Uvicorn3
+        Uvicorn3["uvicorn :8000"]
+        TauriEXE -->|"HTTP 127.0.0.1:8000"| Uvicorn3
     end
 
-    subgraph Mode4["模式 4: Streamlit"]
-        StreamlitApp["streamlit_app.py<br/>:8501"]
+    subgraph Mode4["其他"]
+        MCPS["mcp_server/"]
+        StreamlitApp["streamlit_app.py（旧版）"]
     end
 ```
+
+网页版部署步骤见 [DEPLOYMENT.md](DEPLOYMENT.md#cloudflare-pages网页版推荐)。
 
 ---
 

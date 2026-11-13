@@ -1,6 +1,6 @@
 # FOR-BAZI 部署指南
 
-> 开发、测试、生产环境部署详细步骤
+> 网页版部署在 Cloudflare Pages；Python 后端用于桌面版、MCP 服务器和本地开发。
 
 ---
 
@@ -8,7 +8,7 @@
 
 - [环境要求](#环境要求)
 - [开发环境](#开发环境)
-- [生产部署](#生产部署)
+- [生产部署](#生产部署)（[Cloudflare Pages](#cloudflare-pages网页版推荐) · 传统 · Docker · 云平台）
 - [桌面应用构建](#桌面应用构建)
 - [环境变量](#环境变量)
 - [故障排除](#故障排除)
@@ -103,13 +103,75 @@ npm run dev
 
 1. 打开 http://localhost:5173
 2. 输入出生信息：男，1985-06-15 09:20
-3. 点击"生成命盘"
+3. 点击「排盘」（填完日期时间时右侧已会预览四柱）
 4. 验证命盘数据正确显示
 5. 导航到各页面验证数据渲染
 
 ---
 
 ## 生产部署
+
+### Cloudflare Pages（网页版，推荐）
+
+网页版是纯静态站点加一个同源的 Pages Function（`frontend/functions/api/[[path]].ts`）。
+排盘、工具和古籍检索都在浏览器里执行，不需要 Python 后端；网关只负责把聊天请求转给模型。
+
+**1. 准备 KV 与绑定**
+
+```bash
+cd frontend
+npx wrangler login
+npx wrangler kv namespace create RATE_LIMIT_KV
+```
+
+把输出的 `id` 填进 `frontend/wrangler.toml` 的 `[[kv_namespaces]]`。
+`[ai]` 绑定和下面两个变量已经写在 `wrangler.toml` 里：
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `ANON_DAILY_LIMIT` | `5` | 匿名访问每个 IP 每天可调用几次 |
+| `DEFAULT_MODEL` | `@cf/zai-org/glm-4.7-flash` | 默认模型，必须支持 function calling |
+
+**2. 访问密钥（可选）**
+
+持有访问密钥的人不受匿名限次约束，仍走站长的 Workers AI 额度。多个密钥用英文逗号分隔：
+
+```bash
+npx wrangler pages secret put ACCESS_KEYS --project-name=for-bazi
+```
+
+用户在「设置 → 免费额度」里填入即可，密钥只存在其浏览器本地。
+
+**3. 构建与发布**
+
+```bash
+npm run build
+npx wrangler pages deploy dist --project-name=for-bazi
+```
+
+**4. 验证**
+
+- 打开站点，排一份盘，命盘页应正常显示（这一步不经过网关）。
+- 访问 `/api/quota`，应返回 `{"mode":"anonymous","limit":5,...}`。
+- 在「解读」页点「开始解读」，应能看到「取证」记录和流式正文。
+
+**本地连同网关一起调试**
+
+```bash
+npm run build
+npx wrangler pages dev dist
+```
+
+`npm run dev`（Vite）只托管前端，此时 `/api/*` 会被代理到本地 8000 端口的 Python 后端；
+两个都没开时，站内解读会报「连不上 AI 网关」，排盘和全部图表不受影响。
+
+**网关的三种访问模式**
+
+| 模式 | 判定 | 用谁的额度 | 限次 |
+|---|---|---|---|
+| 匿名 | 没有任何密钥 | 站长的 Workers AI | 每 IP 每天 `ANON_DAILY_LIMIT` 次，计数在 KV |
+| 访问密钥 | `X-Access-Key` 命中 `ACCESS_KEYS` | 站长的 Workers AI | 不限 |
+| 自带服务商 | 设置页填了 Key 与 Base URL | 用户自己的 | 不限；只转发到白名单域名 |
 
 ### 方式一：传统部署
 

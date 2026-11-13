@@ -1,73 +1,35 @@
-# React + TypeScript + Vite
+# FOR-BAZI 前端
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + TypeScript + Vite。排盘引擎、14 个 AI 工具和古籍检索都在这里，网页版不需要后端。
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev        # http://localhost:5173
+npm test           # vitest：引擎对拍、复制文本、真太阳时、农历等
+npm run build      # 产出 dist/
+npm run lint
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 目录
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| 路径 | 内容 |
+|---|---|
+| `src/engine/` | TS 排盘引擎，与仓库根目录的 Python 引擎逐字段对拍（`parity.test.ts`） |
+| `src/lib/chart-view.ts` | 展示模型：页面和复制文本共用的派生量 |
+| `src/lib/chart-text.ts` | 「复制给 AI」的 Markdown / JSON |
+| `src/lib/solar-time.ts` | 农历转公历、夏令时、真太阳时 |
+| `src/lib/relations.ts` | 大运、流年与原局的合冲刑害 |
+| `src/lib/react-agent.ts` | ReAct 循环，经 `/api/chat` 调模型 |
+| `functions/api/` | Cloudflare Pages Function：AI 网关 |
+| `scripts/subset_glyph_font.py` | 生成干支大字的字体子集（需要 `fonttools` 与 `brotli`） |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 站内 AI 解读
+
+`npm run dev` 时 `/api/*` 会代理到本地 8000 端口的 Python 后端。要连同网关一起调试：
+
+```bash
+npm run build
+npx wrangler pages dev dist
 ```
+
+部署步骤见 [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md#cloudflare-pages网页版推荐)，整体架构见 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)。

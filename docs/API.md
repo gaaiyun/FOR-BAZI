@@ -1,6 +1,8 @@
 # FOR-BAZI API 文档
 
-> 后端 API 接口详细说明
+> Python 后端（FastAPI）的接口说明。网页版不调用这些接口：排盘在浏览器里完成，
+> AI 请求走 Pages Function 网关的 `/api/chat` 与 `/api/quota`，见 [DEPLOYMENT.md](DEPLOYMENT.md#cloudflare-pages网页版推荐)。
+> 本文档面向桌面版、MCP 服务器和直接调用后端的场景。
 
 **Base URL**: `http://localhost:8000`
 **API Prefix**: `/api/v1`
@@ -137,7 +139,7 @@ Content-Type: application/json
 | `tg_gan` | `string[4]` | 天干十神 |
 | `tg_zhi` | `string[4]` | 地支藏干十神（空格分隔多个） |
 | `nayin` | `string[4]` | 纳音 |
-| `shensha` | `string[]` | 神煞列表 |
+| `shensha` | `string[]` | 四柱各自的神煞，同柱多个以空格分隔；共 19 种，见 `engine/shensha.py` |
 | `shensha_detail` | `object` | 神煞详细信息，按柱位索引 |
 | `wuxing` | `object` | 五行基础计数（键含英文后缀） |
 | `dayun` | `object[]` | 大运列表 |
