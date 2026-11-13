@@ -1,136 +1,73 @@
 /**
- * ChatInput – textarea with auto-resize, send button, and keyboard shortcuts.
- *
- * - Enter to send, Shift+Enter for newline
- * - Disabled while streaming
- * - Gold accent send button
- * - Placeholder: "向玄冥大师提问..."
+ * 提问输入框。回车发送，Shift + 回车换行；生成中可以停止。
  */
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type FormEvent,
-} from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type FormEvent } from "react";
 import { cn } from "@/lib/utils";
 
-// ── Component ──────────────────────────────────────────────────────────
-
 interface ChatInputProps {
-  /** Called when the user submits a message. */
   onSend: (message: string) => void;
-  /** Whether the input should be disabled (e.g. during streaming). */
+  /** 生成中：发送键变为停止 */
+  busy?: boolean;
+  onStop?: () => void;
   disabled?: boolean;
+  placeholder?: string;
   className?: string;
 }
 
-export function ChatInput({ onSend, disabled = false, className }: ChatInputProps) {
+export function ChatInput({ onSend, busy = false, onStop, disabled = false, placeholder = "问一件具体的事", className }: ChatInputProps) {
   const [value, setValue] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const ref = useRef<HTMLTextAreaElement>(null);
 
-  // ── Auto-resize ────────────────────────────────────────────────────
-
-  const adjustHeight = useCallback(() => {
-    const el = textareaRef.current;
+  // 随内容长高，最多约六行
+  useEffect(() => {
+    const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
-    const maxHeight = 160; // ~6 lines
-    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
-    el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
-  }, []);
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [value]);
 
-  useEffect(() => {
-    adjustHeight();
-  }, [value, adjustHeight]);
-
-  // ── Focus on enable ────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!disabled) {
-      textareaRef.current?.focus();
-    }
-  }, [disabled]);
-
-  // ── Submit ─────────────────────────────────────────────────────────
-
-  const handleSubmit = useCallback(
+  const submit = useCallback(
     (e?: FormEvent) => {
       e?.preventDefault();
-      const trimmed = value.trim();
-      if (!trimmed || disabled) return;
-      onSend(trimmed);
+      const text = value.trim();
+      if (!text || disabled || busy) return;
+      onSend(text);
       setValue("");
     },
-    [value, disabled, onSend]
+    [value, disabled, busy, onSend]
   );
 
-  // ── Key handler ────────────────────────────────────────────────────
-
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit();
-      }
-    },
-    [handleSubmit]
-  );
+  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // 输入法选字时的回车不算发送
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      submit();
+    }
+  };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className={cn(
-        "flex items-end gap-2 rounded-xl border border-border bg-card p-3 transition-colors",
-        "focus-within:border-gold/50",
-        disabled && "opacity-60",
-        className
-      )}
-    >
+    <form onSubmit={submit} className={cn("flex items-end gap-3 border-t border-foreground pt-3", className)}>
       <textarea
-        ref={textareaRef}
+        ref={ref}
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
+        onKeyDown={onKeyDown}
         disabled={disabled}
-        placeholder="向玄冥大师提问..."
+        placeholder={placeholder}
         rows={1}
-        className={cn(
-          "flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground",
-          "outline-none border-none leading-relaxed",
-          "min-h-[24px] max-h-[160px]"
-        )}
+        aria-label="提问"
+        className="max-h-40 min-h-11 flex-1 resize-none bg-transparent py-2.5 leading-relaxed outline-none placeholder:text-faint disabled:opacity-50"
       />
-
-      <button
-        type="submit"
-        disabled={disabled || !value.trim()}
-        className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all",
-          "bg-gold text-background hover:bg-gold/80",
-          "disabled:opacity-40 disabled:cursor-not-allowed",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
-        )}
-        aria-label="发送消息"
-      >
-        {/* Send arrow icon */}
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M22 2 11 13" />
-          <path d="M22 2 15 22 11 13 2 9Z" />
-        </svg>
-      </button>
+      {busy ? (
+        <button type="button" className="btn btn-line" onClick={onStop}>
+          停止
+        </button>
+      ) : (
+        <button type="submit" className="btn btn-primary" disabled={disabled || !value.trim()}>
+          发送
+        </button>
+      )}
     </form>
   );
 }

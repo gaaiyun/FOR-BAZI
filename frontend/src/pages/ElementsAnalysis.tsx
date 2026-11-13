@@ -1,281 +1,217 @@
 /**
- * Five Elements Analysis page (五行).
- * Displays radar chart, bar chart, and detailed breakdown of element power.
- * Includes strong/weak assessment with explanation.
+ * 五行页（/elements）。
+ *
+ * 三层信息：各行占多少（生克图 + 条）、站在日主的角度谁在帮身谁在耗身、
+ * 每一行具体由哪些字构成。最后附《穷通宝鉴》对该日干该月的调候原文。
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader, Section, EmptyState } from "@/components/layout/Page";
-import { useBaziStore } from "@/stores/useBaziStore";
-import { ELEMENT_COLORS } from "@/lib/wuxing-colors";
-import type { WuxingPower } from "@/types/bazi";
-import WuxingRadar from "@/components/bazi/WuxingRadar";
-import WuxingBar from "@/components/bazi/WuxingBar";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { useChartView } from "@/hooks/useChartView";
+import ElementCycle from "@/components/bazi/ElementCycle";
+import Bars from "@/components/bazi/Bars";
+import { ELEMENTS, SHENG, KE, STEM_ELEMENT, type Element } from "@/lib/ganzhi";
+import { ELEMENT_COLORS, getCharColor } from "@/lib/wuxing-colors";
+import { getQiongtongForTool } from "@/engine/classics";
 
-const ELEMENTS = ["金", "木", "水", "火", "土"] as const;
-
-/** English labels for elements. */
-const ELEMENT_EN: Record<string, string> = {
-  金: "Metal",
-  木: "Wood",
-  水: "Water",
-  火: "Fire",
-  土: "Earth",
-};
-
-/**
- * Determine which pillars contribute to each element.
- * Returns a map of element -> list of pillar labels.
- */
-function getSourcePillars(
-  reading: NonNullable<ReturnType<typeof useBaziStore.getState>["reading"]>
-): Record<string, string[]> {
-  const sources: Record<string, string[]> = { 金: [], 木: [], 水: [], 火: [], 土: [] };
-  const pillarLabels = ["年柱", "月柱", "日柱", "时柱"] as const;
-  const pillars = [
-    reading.chart.year_pillar,
-    reading.chart.month_pillar,
-    reading.chart.day_pillar,
-    reading.chart.hour_pillar,
+/** 站在日主角度，五行各是什么角色。 */
+function roles(dm: Element): Array<{ el: Element; role: string; side: "帮身" | "耗身" }> {
+  const sheng = SHENG[dm];
+  const ke = KE[dm];
+  const shengWo = ELEMENTS.find((e) => SHENG[e] === dm)!;
+  const keWo = ELEMENTS.find((e) => KE[e] === dm)!;
+  return [
+    { el: dm, role: "比劫 · 同我", side: "帮身" },
+    { el: shengWo, role: "印星 · 生我", side: "帮身" },
+    { el: sheng, role: "食伤 · 我生", side: "耗身" },
+    { el: ke, role: "财星 · 我克", side: "耗身" },
+    { el: keWo, role: "官杀 · 克我", side: "耗身" },
   ];
-
-  pillars.forEach((p, i) => {
-    if (sources[p.element]) {
-      sources[p.element].push(pillarLabels[i]);
-    }
-    // Hidden stems also count toward the pillar's element.
-    // (Simplified: attribute hidden stems to the same element as the pillar.)
-  });
-
-  return sources;
-}
-
-/**
- * Calculate total power as percentage.
- */
-function toPercentages(
-  balance: Record<string, number>
-): Record<string, number> {
-  const total = Object.values(balance).reduce((s, v) => s + v, 0);
-  if (total === 0) return { 金: 20, 木: 20, 水: 20, 火: 20, 土: 20 };
-  const result: Record<string, number> = {};
-  for (const el of ELEMENTS) {
-    result[el] = ((balance[el] ?? 0) / total) * 100;
-  }
-  return result;
 }
 
 export default function ElementsAnalysis() {
-  const reading = useBaziStore((s) => s.reading);
+  const { reading, view } = useChartView();
+  const [classic, setClassic] = useState<{ key: string; 原文: string; 白话: string; season: string } | null>(null);
 
-  /* ── Derive element data ──────────────────────────────────────── */
-  const elementData = useMemo(() => {
-    if (!reading) return null;
+  const dm = view?.dayMaster ?? "";
+  const monthZhi = view?.pillars[1]?.branch ?? "";
+  const classicKey = dm + monthZhi;
 
-    // Use wuxing_power if available; otherwise fall back to element_balance.
-    const raw: WuxingPower = reading.wuxing_power ?? {
-      金: reading.element_balance.金,
-      木: reading.element_balance.木,
-      水: reading.element_balance.水,
-      火: reading.element_balance.火,
-      土: reading.element_balance.土,
+  useEffect(() => {
+    if (!dm || !monthZhi) return;
+    let alive = true;
+    getQiongtongForTool(dm, monthZhi)
+      .then((r) => {
+        if (!alive) return;
+        const g = r as { 原文?: string; 白话?: string; season?: string };
+        setClassic({ key: dm + monthZhi, 原文: g.原文 ?? "", 白话: g.白话 ?? "", season: g.season ?? "" });
+      })
+      .catch(() => alive && setClassic({ key: dm + monthZhi, 原文: "", 白话: "", season: "" }));
+    return () => {
+      alive = false;
     };
-    const percentages = toPercentages(raw as unknown as Record<string, number>);
-    const sources = getSourcePillars(reading);
+  }, [dm, monthZhi]);
 
-    // Determine strongest and weakest elements.
-    const sorted = [...ELEMENTS].sort(
-      (a, b) => (percentages[b] ?? 0) - (percentages[a] ?? 0)
-    );
-    const strongest = sorted[0];
-    const weakest = sorted[sorted.length - 1];
+  // 每一行由哪些字构成
+  const sources = useMemo(() => {
+    const out = Object.fromEntries(ELEMENTS.map((e) => [e, { stems: [] as string[], hidden: [] as string[] }])) as Record<
+      Element,
+      { stems: string[]; hidden: string[] }
+    >;
+    for (const p of view?.pillars ?? []) {
+      const short = p.label[0];
+      const se = STEM_ELEMENT[p.stem];
+      if (se) out[se].stems.push(`${p.stem}（${short}干）`);
+      for (const h of p.hidden) {
+        const he = STEM_ELEMENT[h.stem];
+        if (he) out[he].hidden.push(`${h.stem}（${short}支${p.branch}）`);
+      }
+    }
+    return out;
+  }, [view]);
 
-    return { raw, percentages, sources, strongest, weakest };
-  }, [reading]);
-
-  /* ── No data state ────────────────────────────────────────────── */
-  if (!reading || !elementData) {
+  if (!reading || !view || !view.dayMasterElement) {
     return (
       <div className="animate-fade-in">
-        <PageHeader title="五行" en="Five Elements" description="含藏干、月令加权与十二长生的力量精算" />
+        <PageHeader title="五行" description="力量占比、生克关系与构成。" />
         <EmptyState />
       </div>
     );
   }
 
-  const { raw, percentages, sources, strongest, weakest } = elementData;
+  const dmEl = view.dayMasterElement;
+  const rl = roles(dmEl);
+  const help = rl.filter((r) => r.side === "帮身").reduce((s, r) => s + view.power[r.el], 0);
+  const drain = 100 - help;
+  const sorted = [...ELEMENTS].sort((a, b) => view.power[b] - view.power[a]);
+  const tiaohou = classic && classic.key === classicKey && classic.原文 ? classic : null;
 
   return (
-    <div className="animate-fade-in space-y-6">
-      <PageHeader title="五行" en="Five Elements" description="含藏干、月令加权与十二长生的力量精算" />
+    <div className="animate-fade-in">
+      <PageHeader
+        title="五行"
+        description="力量按天干、地支藏干（本气、中气、余气）计分，月令加权，再乘十二长生状态系数，归一化为 100%。"
+      />
 
-      {/* ── Strong/Weak Assessment ──────────────────────────────── */}
-      <Section
-        title="强弱评估"
-        description={`日主 ${reading.chart.day_master}（${reading.chart.day_master_element}）`}
-      >
-          <div className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">最强:</span>
-              <Badge
-                variant="secondary"
-                className="text-sm"
-                style={{
-                  backgroundColor: ELEMENT_COLORS[strongest] + "30",
-                  color: ELEMENT_COLORS[strongest],
-                  borderColor: ELEMENT_COLORS[strongest] + "60",
-                }}
-              >
-                {strongest} ({ELEMENT_EN[strongest]})
-              </Badge>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">最弱:</span>
-              <Badge
-                variant="secondary"
-                className="text-sm"
-                style={{
-                  backgroundColor: ELEMENT_COLORS[weakest] + "30",
-                  color: ELEMENT_COLORS[weakest],
-                  borderColor: ELEMENT_COLORS[weakest] + "60",
-                }}
-              >
-                {weakest} ({ELEMENT_EN[weakest]})
-              </Badge>
-            </div>
-          </div>
-          {reading.strengths && reading.strengths.length > 0 && (
-            <div className="mt-4 space-y-1">
-              <p className="text-sm font-medium text-foreground">优势:</p>
-              {reading.strengths.map((s, i) => (
-                <p key={i} className="text-sm text-muted-foreground pl-3 border-l-2 border-jade/40">
-                  {s}
-                </p>
-              ))}
-            </div>
-          )}
-          {reading.weaknesses && reading.weaknesses.length > 0 && (
-            <div className="mt-4 space-y-1">
-              <p className="text-sm font-medium text-foreground">不足:</p>
-              {reading.weaknesses.map((w, i) => (
-                <p key={i} className="text-sm text-muted-foreground pl-3 border-l-2 border-crimson/40">
-                  {w}
-                </p>
-              ))}
-            </div>
-          )}
-        </Section>
-
-      {/* ── Charts Row ──────────────────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Section title="五行雷达图" description="五行力量分布总览">
-            <WuxingRadar wuxingPower={raw} dayMasterElement={reading.chart.day_master_element} />
-          </Section>
-
-        <Section title="五行力量柱状图" description="各元素力量百分比">
-            <WuxingBar wuxingPower={raw} dayMasterElement={reading.chart.day_master_element} />
-          </Section>
+      <div className="grid items-center gap-x-14 gap-y-8 border-t border-foreground pt-8 sm:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
+        <ElementCycle power={view.power} dayMasterElement={dmEl} className="mx-auto block w-full max-w-[21rem]" />
+        <div>
+          <Bars
+            rows={ELEMENTS.map((e) => ({
+              key: e,
+              label: e,
+              value: view.power[e],
+              display: `${view.power[e].toFixed(1)}%`,
+              note: [e === dmEl ? "日主" : "", e === sorted[0] ? "最旺" : "", e === sorted[4] ? "最弱" : ""]
+                .filter(Boolean)
+                .join(" · ") || undefined,
+              color: ELEMENT_COLORS[e],
+            }))}
+          />
+          <p className="mt-6 text-xs leading-relaxed text-muted-foreground">
+            图中圆的面积对应占比；实线箭头为相生，虚线为相克；带外圈的是日主所属五行。
+          </p>
+        </div>
       </div>
 
-      {/* ── Detailed Breakdown ──────────────────────────────────── */}
-      <Section title="五行详解" description="每个元素的来源与力量占比">
-          <div className="space-y-4">
-            {ELEMENTS.map((el, i) => (
-              <div key={el}>
-                {i > 0 && <Separator className="mb-4" />}
-                <div className="flex items-start gap-4">
-                  {/* Element icon / label */}
-                  <div
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-xl font-bold font-heading"
-                    style={{
-                      backgroundColor: ELEMENT_COLORS[el] + "20",
-                      color: ELEMENT_COLORS[el],
-                      border: `1px solid ${ELEMENT_COLORS[el]}40`,
-                    }}
-                  >
-                    {el}
-                  </div>
-                  {/* Details */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-base font-medium text-foreground">
-                        {el} · {ELEMENT_EN[el]}
-                      </h3>
-                      <span className="text-sm font-mono" style={{ color: ELEMENT_COLORS[el] }}>
-                        {percentages[el]?.toFixed(1)}%
-                      </span>
-                    </div>
-                    {/* Progress bar */}
-                    <div className="mt-2 h-2 w-full rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${Math.min(100, percentages[el] ?? 0)}%`,
-                          backgroundColor: ELEMENT_COLORS[el],
-                        }}
-                      />
-                    </div>
-                    {/* Sources */}
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      来源:{" "}
-                      {sources[el] && sources[el].length > 0
-                        ? sources[el].join("、")
-                        : "无直接来源"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Section>
-
-      {/* ── Favorable / Unfavorable ─────────────────────────────── */}
-      {(reading.favorable_elements?.length > 0 ||
-        reading.unfavorable_elements?.length > 0) && (
-        <div className="grid gap-6 md:grid-cols-2">
-          {reading.favorable_elements?.length > 0 && (
-            <Section title="喜用神" description="有利的五行元素">
-                <div className="flex flex-wrap gap-2">
-                  {reading.favorable_elements.map((el) => (
-                    <Badge
-                      key={el}
-                      variant="secondary"
-                      className="text-sm"
-                      style={{
-                        backgroundColor: ELEMENT_COLORS[el] + "30",
-                        color: ELEMENT_COLORS[el],
-                        borderColor: ELEMENT_COLORS[el] + "60",
-                      }}
-                    >
-                      {el}
-                    </Badge>
-                  ))}
-                </div>
-              </Section>
-          )}
-          {reading.unfavorable_elements?.length > 0 && (
-            <Section title="忌神" description="不利的五行元素">
-                <div className="flex flex-wrap gap-2">
-                  {reading.unfavorable_elements.map((el) => (
-                    <Badge
-                      key={el}
-                      variant="secondary"
-                      className="text-sm"
-                      style={{
-                        backgroundColor: ELEMENT_COLORS[el] + "30",
-                        color: ELEMENT_COLORS[el],
-                        borderColor: ELEMENT_COLORS[el] + "60",
-                      }}
-                    >
-                      {el}
-                    </Badge>
-                  ))}
-                </div>
-              </Section>
-          )}
+      <Section
+        className="mt-10"
+        title="帮身与耗身"
+        description={`日主 ${view.dayMaster} 属${dmEl}。同我、生我为帮；我生、我克、克我为耗。`}
+      >
+        <div className="flex items-baseline justify-between text-sm">
+          <span>
+            帮身 <span className="tabular font-heading text-2xl font-semibold">{help.toFixed(1)}</span>%
+          </span>
+          <span>
+            耗身 <span className="tabular font-heading text-2xl font-semibold">{drain.toFixed(1)}</span>%
+          </span>
         </div>
+        <div className="mt-3 flex h-2 w-full gap-px" role="img" aria-label={`帮身 ${help.toFixed(1)}%，耗身 ${drain.toFixed(1)}%`}>
+          {rl.map((r) => (
+            <div
+              key={r.el}
+              className="draw-x h-full"
+              style={{ width: `${view.power[r.el]}%`, background: ELEMENT_COLORS[r.el] }}
+              title={`${r.el} ${view.power[r.el].toFixed(1)}%`}
+            />
+          ))}
+        </div>
+        <div className="mt-6 overflow-x-auto">
+          <table className="ledger min-w-[22rem]">
+            <thead>
+              <tr>
+                <th>五行</th>
+                <th>对日主</th>
+                <th>归类</th>
+                <th className="text-right">占比</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rl.map((r) => (
+                <tr key={r.el}>
+                  <td className="font-heading text-lg font-semibold" style={{ color: ELEMENT_COLORS[r.el] }}>
+                    {r.el}
+                  </td>
+                  <td>{r.role}</td>
+                  <td className="text-muted-foreground">{r.side}</td>
+                  <td className="tabular text-right">{view.power[r.el].toFixed(1)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {view.geju && (
+          <p className="mt-5 text-[0.9375rem] leading-[1.9]">
+            按日主所属五行占比判定：<span className="font-semibold">{view.geju.日主强弱}</span>
+            （{view.geju.日主力量占比}%；35% 以上为身旺，20% 以下为身弱）。
+          </p>
+        )}
+      </Section>
+
+      <Section title="构成" description="每一行由哪些天干和藏干贡献。">
+        <div className="overflow-x-auto">
+          <table className="ledger min-w-[24rem]">
+            <thead>
+              <tr>
+                <th>五行</th>
+                <th>天干</th>
+                <th>地支藏干</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ELEMENTS.map((e) => (
+                <tr key={e}>
+                  <td className="font-heading text-lg font-semibold" style={{ color: ELEMENT_COLORS[e] }}>
+                    {e}
+                  </td>
+                  <td>{sources[e].stems.join("　") || <span className="text-faint">不见</span>}</td>
+                  <td>{sources[e].hidden.join("　") || <span className="text-faint">不见</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      {tiaohou && (
+        <Section
+          title="调候"
+          description={
+            <>
+              《穷通宝鉴》论
+              <span style={{ color: getCharColor(dm) }}> {dm} </span>
+              日生于{monthZhi}月。
+            </>
+          }
+        >
+          <blockquote className="max-w-2xl border-l border-foreground pl-5 font-serif text-[1.0625rem] leading-[2]">
+            {tiaohou.原文}
+          </blockquote>
+          {tiaohou.白话 && (
+            <p className="mt-4 max-w-2xl text-[0.9375rem] leading-[1.9] text-muted-foreground">{tiaohou.白话}</p>
+          )}
+        </Section>
       )}
     </div>
   );

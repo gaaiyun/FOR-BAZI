@@ -1,10 +1,37 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>玄冥 · 八字排盘</title>
+    <meta name="description" content="八字排盘：四柱、藏干、十神、五行力量、格局、大运流年，全部在浏览器本地算出，可一键复制给自己的 AI 解读。" />
+    <meta name="theme-color" content="#f4f5f7" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="玄冥" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <script>
+      // 首帧之前定好昼夜，避免闪烁。逻辑与 src/lib/theme.ts 保持一致。
+      (function () {
+        var mode = "system";
+        try {
+          var raw = localStorage.getItem("settings-storage");
+          if (raw) mode = (JSON.parse(raw).state || {}).theme || "system";
+        } catch (e) {}
+        var dark =
+          mode === "dark" ||
+          (mode !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) {
+          document.documentElement.classList.add("dark");
+          document.querySelector('meta[name="theme-color"]').setAttribute("content", "#0e1014");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

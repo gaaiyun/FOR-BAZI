@@ -1,250 +1,407 @@
 /**
- * BaziCalculator page (/) -- main input form for Bazi calculation.
- * Collects birth date, time, and gender, then calls the API
- * and navigates to /chart on success.
+ * 排盘页（/）。
+ *
+ * 排盘是纯本地计算，所以不必等用户点按钮：日期时间一填完整，右侧就即时
+ * 显示四柱预览，改一个时辰能立刻看到时柱怎么变。点「排盘」才把这份命盘
+ * 存下来并进入命盘页。
+ *
+ * 支持公历 / 农历（含闰月）输入，以及按出生地经度做真太阳时校正。
  */
 
-import { useCallback } from "react";
+import { useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBaziStore } from "@/stores/useBaziStore";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader, Section } from "@/components/layout/Page";
+import { calculateChart } from "@/engine";
+import { resolveBirth, formatDateTime, CITIES } from "@/lib/solar-time";
+import { BRANCHES } from "@/lib/ganzhi";
+import { getCharColor } from "@/lib/wuxing-colors";
+import type { BaziInput, BaziReading } from "@/types/bazi";
 
-// ── Component ─────────────────────────────────────────────────────
+const CUSTOM = "__custom__";
+
+/** 23:00–00:59 子时，01:00–02:59 丑时…… */
+function shichen(d: Date): string {
+  return BRANCHES[Math.floor(((d.getHours() + 1) % 24) / 2)] + "时";
+}
+
+function usePreview(input: BaziInput) {
+  return useMemo(() => {
+    // 农历三个框没填全时 birth_date 形如 "1985--"，同样算未填完
+    if (!/^\d{4}-\d{1,2}-\d{1,2}$/.test(input.birth_date) || !input.birth_time) {
+      return { state: "empty" as const };
+    }
+    try {
+      const r = resolveBirth(input);
+      const y = r.effective.getFullYear();
+      if (y < 1900 || y > 2100) return { state: "error" as const, message: "目前支持 1900–2100 年出生。" };
+      const gender = input.gender === "male" ? "乾造 (Male)" : "坤造 (Female)";
+      const { chart } = calculateChart(formatDateTime(r.effective), gender);
+      return { state: "ok" as const, resolved: r, pillars: chart.pillars };
+    } catch (e) {
+      return { state: "error" as const, message: e instanceof Error ? e.message : "无法解析出生时间。" };
+    }
+  }, [input]);
+}
 
 export default function BaziCalculator() {
   const navigate = useNavigate();
-  const { input, setInput, calculate, isLoading, error } = useBaziStore();
-
-  // ── Handlers ──────────────────────────────────────────────────
+  const { input, setInput, calculate, error, history, openFromHistory, removeFromHistory } = useBaziStore();
+  const preview = usePreview(input);
+  const lunar = input.calendar_type === "lunar";
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      const reading = await calculate();
-      if (reading) {
-        navigate("/chart");
-      }
+      if (await calculate()) navigate("/chart");
     },
     [calculate, navigate]
   );
 
-  // ── Loading skeleton ──────────────────────────────────────────
+  // 出生地下拉的当前值
+  const placeValue = !input.true_solar
+    ? ""
+    : CITIES.some((c) => c.name === input.place)
+      ? (input.place as string)
+      : CUSTOM;
 
-  if (isLoading) {
-    return (
-      <div className="animate-fade-in space-y-6">
-        <div>
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="mt-2 h-4 w-96" />
-        </div>
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card className="border border-border bg-card/60 backdrop-blur-md">
-            <CardHeader>
-              <Skeleton className="h-6 w-40" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-32" />
-            </CardContent>
-          </Card>
-          <Card className="border border-border bg-card/60 backdrop-blur-md">
-            <CardHeader>
-              <Skeleton className="h-6 w-40" />
-            </CardHeader>
-            <CardContent className="flex flex-col items-center gap-4 py-12">
-              <div className="rounded-full p-6">
-                <Skeleton className="h-16 w-16 rounded-full" />
-              </div>
-              <Skeleton className="h-4 w-48" />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+  const onPlace = (v: string) => {
+    if (!v) return setInput({ true_solar: false, place: "", longitude: null });
+    if (v === CUSTOM) return setInput({ true_solar: true, place: "", longitude: input.longitude ?? 116.4 });
+    const city = CITIES.find((c) => c.name === v);
+    if (city) setInput({ true_solar: true, place: city.name, longitude: city.lng });
+  };
 
-  // ── Main form ─────────────────────────────────────────────────
+  // 农历输入拆成年、月、日三个框；公历用原生日期选择器
+  const [ly, lm, ld] = (input.birth_date || "--").split("-");
+  const setLunarPart = (part: 0 | 1 | 2, v: string) => {
+    const parts = [ly || "", lm || "", ld || ""];
+    parts[part] = v;
+    setInput({ birth_date: parts.join("-") });
+  };
 
   return (
-    <div className="animate-fade-in mx-auto max-w-5xl space-y-8">
-      {/* ── Hero：让人一眼知道这是什么、算的是什么 ─────────────── */}
-      <header className="relative overflow-hidden rounded-2xl surface-raised px-6 py-9 sm:px-10 sm:py-12">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full opacity-[0.07]"
-          style={{ background: "radial-gradient(circle, var(--primary), transparent 70%)" }}
-        />
-        {/* 八卦爻线 motif。用 SVG 而非 Unicode 卦象字符：
-            ䷀ 这类字符多数中文字体缺字，会渲染成乱码方块。 */}
-        <svg
-          aria-hidden
-          viewBox="0 0 120 120"
-          className="pointer-events-none absolute right-8 top-1/2 hidden h-36 w-36 -translate-y-1/2 sm:block"
-        >
-          <g fill="var(--primary)" opacity="0.09">
-            {[0, 1, 2, 3, 4, 5].map((i) =>
-              i % 2 === 0 ? (
-                <rect key={i} x="10" y={i * 20 + 4} width="100" height="9" rx="4.5" />
-              ) : (
-                <g key={i}>
-                  <rect x="10" y={i * 20 + 4} width="42" height="9" rx="4.5" />
-                  <rect x="68" y={i * 20 + 4} width="42" height="9" rx="4.5" />
-                </g>
-              )
-            )}
-          </g>
-        </svg>
+    <div className="animate-fade-in">
+      <PageHeader
+        title="排盘"
+        description="四柱、藏干、十神、五行力量、格局与大运都在你的浏览器里按规则算出，不经过大模型，也不上传出生信息。"
+      />
 
-        <div className="relative max-w-xl">
-          <p className="rule-accent text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-            Four Pillars of Destiny
-          </p>
-          <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            玄冥 · 八字排盘
-          </h1>
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            四柱、藏干、纳音、神煞、大运全部由确定性规则算出，<span className="text-foreground/80">不经过大模型</span>；
-            AI 只负责在算好的命盘上解读，且引用流年与古籍原文时必须调用工具取证。
-          </p>
-
-          <dl className="mt-6 flex flex-wrap gap-x-8 gap-y-3">
-            {[
-              { k: "计算方式", v: "浏览器本地" },
-              { k: "古籍库", v: "五部经典" },
-              { k: "回归测试", v: "478 项" },
-            ].map((s) => (
-              <div key={s.k}>
-                <dt className="text-[11px] text-muted-foreground">{s.k}</dt>
-                <dd className="mt-0.5 text-sm font-medium text-foreground">{s.v}</dd>
+      <div className="grid gap-x-16 gap-y-10 border-t border-foreground pt-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+        {/* ── 表单 ─────────────────────────────────────────────── */}
+        <form onSubmit={handleSubmit} className="space-y-7" noValidate>
+          <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
+            <fieldset>
+              <legend className="eyebrow">性别</legend>
+              <div className="seg mt-1" role="radiogroup">
+                {([
+                  { v: "male", label: "男 · 乾造" },
+                  { v: "female", label: "女 · 坤造" },
+                ] as const).map((g) => (
+                  <button
+                    key={g.v}
+                    type="button"
+                    role="radio"
+                    aria-checked={input.gender === g.v}
+                    data-on={input.gender === g.v}
+                    onClick={() => setInput({ gender: g.v })}
+                  >
+                    {g.label}
+                  </button>
+                ))}
               </div>
-            ))}
-          </dl>
-        </div>
-      </header>
+            </fieldset>
 
-      <div className="grid gap-6 md:grid-cols-[1.1fr_1fr]">
-        {/* ── 输入 ─────────────────────────────────────────────── */}
-        <section className="surface-panel rounded-xl p-6">
-          <h2 className="rule-accent font-heading text-base font-semibold text-foreground">
-            出生信息
-          </h2>
+            <fieldset>
+              <legend className="eyebrow">历法</legend>
+              <div className="seg mt-1" role="radiogroup">
+                {([
+                  { v: "solar", label: "公历" },
+                  { v: "lunar", label: "农历" },
+                ] as const).map((c) => (
+                  <button
+                    key={c.v}
+                    type="button"
+                    role="radio"
+                    aria-checked={(input.calendar_type ?? "solar") === c.v}
+                    data-on={(input.calendar_type ?? "solar") === c.v}
+                    onClick={() => setInput({ calendar_type: c.v, birth_date: "", lunar_leap: false })}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          </div>
 
-          <form onSubmit={handleSubmit} className="mt-5 space-y-5">
-            <div className="space-y-1.5">
-              <label htmlFor="birth-date" className="block text-sm font-medium text-muted-foreground">
-                出生日期
+          <div className="grid gap-x-8 gap-y-7 sm:grid-cols-2">
+            {lunar ? (
+              <fieldset>
+                <legend className="eyebrow">农历出生日期</legend>
+                <div className="mt-1 grid grid-cols-[1.3fr_1fr_1fr] gap-3">
+                  <input
+                    className="field tabular"
+                    inputMode="numeric"
+                    placeholder="年"
+                    aria-label="农历年"
+                    maxLength={4}
+                    value={ly || ""}
+                    onChange={(e) => setLunarPart(0, e.target.value.replace(/\D/g, ""))}
+                  />
+                  <select className="field" aria-label="农历月" value={lm || ""} onChange={(e) => setLunarPart(1, e.target.value)}>
+                    <option value="">月</option>
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <option key={i} value={String(i + 1)}>
+                        {i + 1} 月
+                      </option>
+                    ))}
+                  </select>
+                  <select className="field" aria-label="农历日" value={ld || ""} onChange={(e) => setLunarPart(2, e.target.value)}>
+                    <option value="">日</option>
+                    {Array.from({ length: 30 }, (_, i) => (
+                      <option key={i} value={String(i + 1)}>
+                        {i + 1} 日
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-[var(--foreground)]"
+                    checked={Boolean(input.lunar_leap)}
+                    onChange={(e) => setInput({ lunar_leap: e.target.checked })}
+                  />
+                  这个月是闰月
+                </label>
+              </fieldset>
+            ) : (
+              <label className="block">
+                <span className="eyebrow">公历出生日期</span>
+                <input
+                  type="date"
+                  required
+                  min="1900-01-01"
+                  max="2100-12-31"
+                  value={input.birth_date}
+                  onChange={(e) => setInput({ birth_date: e.target.value })}
+                  className="field tabular mt-1"
+                />
               </label>
-              <input
-                id="birth-date"
-                type="date"
-                required
-                value={input.birth_date}
-                onChange={(e) => setInput({ birth_date: e.target.value })}
-                className="w-full rounded-lg border border-border bg-background/60 px-3 py-2.5 text-foreground outline-none transition-[border-color,box-shadow] duration-[var(--dur-fast)] focus:border-gold focus:ring-2 focus:ring-gold/25"
-              />
-            </div>
+            )}
 
-            <div className="space-y-1.5">
-              <label htmlFor="birth-time" className="block text-sm font-medium text-muted-foreground">
-                出生时辰
-              </label>
+            <label className="block">
+              <span className="eyebrow">出生时间</span>
               <input
-                id="birth-time"
                 type="time"
                 required
                 value={input.birth_time}
                 onChange={(e) => setInput({ birth_time: e.target.value })}
-                className="w-full rounded-lg border border-border bg-background/60 px-3 py-2.5 text-foreground outline-none transition-[border-color,box-shadow] duration-[var(--dur-fast)] focus:border-gold focus:ring-2 focus:ring-gold/25"
+                className="field tabular mt-1"
               />
-              <p className="text-[11px] text-muted-foreground">
-                时辰决定时柱与大运起运，尽量精确到分钟
-              </p>
+              <span className="mt-2 block text-xs text-muted-foreground">
+                按出生证或户口本上的钟表时间填，精确到分钟
+              </span>
+            </label>
+          </div>
+
+          <div className="grid gap-x-8 gap-y-7 sm:grid-cols-2">
+            <div>
+              <label className="block">
+                <span className="eyebrow">出生地（真太阳时）</span>
+                <select className="field mt-1" value={placeValue} onChange={(e) => onPlace(e.target.value)}>
+                  <option value="">不校正，按北京时间</option>
+                  {CITIES.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}（东经 {c.lng.toFixed(1)}°）
+                    </option>
+                  ))}
+                  <option value={CUSTOM}>其他地点，自己填经度</option>
+                </select>
+              </label>
+              {placeValue === CUSTOM && (
+                <label className="mt-4 block">
+                  <span className="eyebrow">东经（度）</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min={60}
+                    max={140}
+                    className="field tabular mt-1"
+                    value={input.longitude ?? ""}
+                    onChange={(e) =>
+                      setInput({ longitude: e.target.value === "" ? null : Number(e.target.value) })
+                    }
+                  />
+                </label>
+              )}
             </div>
 
-            <div className="space-y-1.5">
-              <span className="block text-sm font-medium text-muted-foreground">性别</span>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { v: "male" as const, label: "乾造", sub: "男" },
-                  { v: "female" as const, label: "坤造", sub: "女" },
-                ].map((g) => {
-                  const active = input.gender === g.v;
-                  return (
-                    <label
-                      key={g.v}
-                      className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm transition-[background-color,border-color] duration-[var(--dur-fast)] ${
-                        active
-                          ? "border-gold/50 bg-gold/10 text-gold"
-                          : "border-border bg-background/40 text-foreground/80 hover:border-border/80 hover:bg-background/60"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="gender"
-                        value={g.v}
-                        checked={active}
-                        onChange={() => setInput({ gender: g.v })}
-                        className="sr-only"
-                      />
-                      <span className="font-medium">{g.label}</span>
-                      <span className="text-xs opacity-70">{g.sub}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              <p className="text-[11px] text-muted-foreground">性别决定大运顺行或逆行</p>
-            </div>
+            <label className="block">
+              <span className="eyebrow">称呼（可不填）</span>
+              <input
+                className="field mt-1"
+                value={input.name ?? ""}
+                maxLength={20}
+                placeholder="用来区分多份命盘"
+                onChange={(e) => setInput({ name: e.target.value })}
+              />
+            </label>
+          </div>
 
-            {error && (
-              <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {error}
-              </p>
-            )}
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
 
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gold py-2.5 font-semibold text-background hover:bg-gold/85"
-            >
-              {isLoading ? "计算中…" : "生成命盘"}
-            </Button>
-          </form>
-        </section>
+          <div className="pt-2 lg:hidden">
+            <Preview preview={preview} />
+          </div>
 
-        {/* ── 说明：把空placeholder换成真正有信息的内容 ─────────── */}
-        <section className="surface-panel rounded-xl p-6">
-          <h2 className="rule-accent font-heading text-base font-semibold text-foreground">
-            会算出什么
-          </h2>
+          <button type="submit" className="btn btn-primary w-full sm:w-auto sm:min-w-40" disabled={preview.state !== "ok"}>
+            排盘
+          </button>
+        </form>
 
-          <ul className="mt-5 space-y-4">
-            {[
-              { t: "四柱与十神", d: "年月日时干支、藏干、纳音、地势、旬空" },
-              { t: "五行力量", d: "含藏干、月令加权与十二长生的精算，非简单计数" },
-              { t: "格局判定", d: "取格看透干；从格须过传统判准，不轻言从" },
-              { t: "大运流年", d: "起运推演至九步，可查任一年所处阶段" },
-              { t: "神煞刑冲", d: "桃花驿马等八类神煞，六合六冲三合三会" },
-            ].map((f) => (
-              <li key={f.t} className="flex gap-3">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gold/60" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">{f.t}</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{f.d}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-
-          <p className="mt-6 border-t border-border/60 pt-4 text-[11px] leading-relaxed text-muted-foreground">
-            命理属传统文化范畴。程序按既定规则运行不代表结论具有科学预测效力，
-            请勿据此做医疗、投资或人生决策。
-          </p>
-        </section>
+        {/* ── 即时预览（宽屏）────────────────────────────────────── */}
+        <aside className="hidden lg:block">
+          <Preview preview={preview} />
+        </aside>
       </div>
+
+      {history.length > 0 && (
+        <Section title="排过的命盘" description="只存在这台设备的浏览器里。" className="mt-12">
+          <History
+            items={history}
+            onOpen={(id) => {
+              openFromHistory(id);
+              navigate("/chart");
+            }}
+            onRemove={removeFromHistory}
+          />
+        </Section>
+      )}
+
+      <p className="mt-10 max-w-xl text-xs leading-relaxed text-faint">
+        命理属传统文化范畴。程序按既定规则运行，不代表结论具有科学预测效力，请勿据此做医疗、投资或其他重大决定。
+      </p>
     </div>
+  );
+}
+
+function Preview({ preview }: { preview: ReturnType<typeof usePreview> }) {
+  if (preview.state === "empty") {
+    return (
+      <div>
+        <p className="eyebrow">四柱预览</p>
+        <div className="glyph mt-4 flex gap-5 text-[2.75rem] text-rule" aria-hidden>
+          {["年", "月", "日", "时"].map((c) => (
+            <span key={c} className="flex flex-col gap-2">
+              <span>○</span>
+              <span>○</span>
+            </span>
+          ))}
+        </div>
+        <p className="mt-5 text-sm text-muted-foreground">填好日期和时间，这里会立刻显示四柱。</p>
+      </div>
+    );
+  }
+  if (preview.state === "error") {
+    return (
+      <div>
+        <p className="eyebrow">四柱预览</p>
+        <p role="alert" className="mt-4 text-sm text-destructive">
+          {preview.message}
+        </p>
+      </div>
+    );
+  }
+  const { resolved, pillars } = preview;
+  return (
+    <div>
+      <p className="eyebrow">四柱预览</p>
+      <div className="glyph mt-4 flex gap-5 text-[2.75rem] sm:text-[3.25rem]" key={pillars.join("")}>
+        {pillars.map((p, i) => (
+          <span
+            key={i}
+            className="flex flex-col gap-2"
+            style={{ animation: `ink-in 500ms var(--ease-out-expo) ${i * 60}ms both` }}
+          >
+            <span style={{ color: getCharColor(p[0]) }}>{p[0]}</span>
+            <span style={{ color: getCharColor(p[1]) }}>{p[1]}</span>
+          </span>
+        ))}
+      </div>
+      <dl className="mt-5 space-y-1.5 text-sm">
+        <div className="flex gap-3">
+          <dt className="w-16 shrink-0 text-muted-foreground">排盘时间</dt>
+          <dd className="tabular">
+            {formatDateTime(resolved.effective)}
+            <span className="ml-3">{shichen(resolved.effective)}</span>
+          </dd>
+        </div>
+        {resolved.notes.map((n) => (
+          <div key={n} className="flex gap-3">
+            <dt className="w-16 shrink-0 text-muted-foreground">换算</dt>
+            <dd className="text-muted-foreground">{n}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+function History({
+  items,
+  onOpen,
+  onRemove,
+}: {
+  items: BaziReading[];
+  onOpen: (id: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <ul>
+      {items.map((r, idx) => {
+        const c = r.chart;
+        const gz = [c.year_pillar, c.month_pillar, c.day_pillar, c.hour_pillar];
+        const id = r.id ?? "";
+        return (
+          <li key={id || idx} className="flex items-center gap-4 border-b border-rule py-3 first:pt-0 last:border-b-0">
+            <button
+              type="button"
+              disabled={!id}
+              onClick={() => onOpen(id)}
+              className="group flex min-w-0 flex-1 flex-wrap items-baseline gap-x-5 gap-y-1 text-left"
+            >
+              <span className="glyph flex gap-2 text-xl">
+                {gz.map((p, i) => (
+                  <span key={i}>
+                    <span style={{ color: getCharColor(p.stem) }}>{p.stem}</span>
+                    <span style={{ color: getCharColor(p.branch) }}>{p.branch}</span>
+                  </span>
+                ))}
+              </span>
+              <span className="min-w-0 truncate text-sm text-muted-foreground group-hover:text-foreground">
+                {[r.birth?.name, r.birth ? (r.birth.gender === "male" ? "男" : "女") : null, r.birth?.clock, r.birth?.place]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </button>
+            {id && (
+              <button
+                type="button"
+                onClick={() => onRemove(id)}
+                className="shrink-0 py-2 text-xs text-faint transition-colors hover:text-destructive"
+                aria-label="删除这份命盘"
+              >
+                删除
+              </button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

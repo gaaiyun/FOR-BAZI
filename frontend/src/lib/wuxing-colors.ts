@@ -1,70 +1,38 @@
 /**
- * Wuxing (Five Elements) color mappings for Bazi characters.
- * Ported from the Streamlit FOR-BAZI application.
+ * 五行配色。
  *
- * Each Heavenly Stem (天干) and Earthly Branch (地支) is assigned
- * a color corresponding to its Wuxing element:
- *   Wood (木) = Jade Green  | Fire (火) = Crimson
- *   Earth (土) = Gold       | Metal (金) = Silver
- *   Water (水) = Azure Blue
+ * 颜色值是 CSS 变量而不是十六进制：昼夜两套主题下同一个五行要用不同的
+ * 明度才看得清，交给样式表决定。因此这里返回的字符串只能用在 color / fill /
+ * stroke / background 上，不能再往后拼透明度后缀——要半透明请用 color-mix。
  */
 
-/** Color hex for each individual Chinese character used in Bazi pillars. */
-export const WUXING_CHAR_COLORS: Record<string, string> = {
-  // Wood (木) – Jade Green
-  "甲": "#50c878",
-  "乙": "#50c878",
-  "寅": "#50c878",
-  "卯": "#50c878",
+import { elementOf } from "./ganzhi";
 
-  // Fire (火) – Crimson
-  "丙": "#e94560",
-  "丁": "#e94560",
-  "巳": "#e94560",
-  "午": "#e94560",
-
-  // Earth (土) – Gold
-  "戊": "#d4af37",
-  "己": "#d4af37",
-  "辰": "#d4af37",
-  "戌": "#d4af37",
-  "丑": "#d4af37",
-  "未": "#d4af37",
-
-  // Metal (金) – Silver
-  "庚": "#c0c0c0",
-  "辛": "#c0c0c0",
-  "申": "#c0c0c0",
-  "酉": "#c0c0c0",
-
-  // Water (水) – Azure Blue
-  "壬": "#4a90d9",
-  "癸": "#4a90d9",
-  "亥": "#4a90d9",
-  "子": "#4a90d9",
-};
-
-/** Color hex for each Wuxing element name. */
 export const ELEMENT_COLORS: Record<string, string> = {
-  "金": "#c0c0c0",
-  "木": "#50c878",
-  "水": "#4a90d9",
-  "火": "#e94560",
-  "土": "#d4af37",
+  木: "var(--wx-wood)",
+  火: "var(--wx-fire)",
+  土: "var(--wx-earth)",
+  金: "var(--wx-metal)",
+  水: "var(--wx-water)",
 };
 
-/**
- * Returns the Wuxing color for a given Bazi character.
- * Falls back to the default text color if the character is unknown.
- */
-export function getCharColor(char: string, fallback = "#e6edf3"): string {
-  return WUXING_CHAR_COLORS[char] ?? fallback;
+/** 干支字 → 五行色。未知字符退回正文色。 */
+export function getCharColor(char: string, fallback = "var(--foreground)"): string {
+  return ELEMENT_COLORS[elementOf(char)] ?? fallback;
 }
 
-/**
- * Returns the color for a Wuxing element name.
- * Falls back to the default text color if the element is unknown.
- */
-export function getElementColor(element: string, fallback = "#e6edf3"): string {
+/** 五行名 → 五行色。 */
+export function getElementColor(element: string, fallback = "var(--foreground)"): string {
   return ELEMENT_COLORS[element] ?? fallback;
 }
+
+/** 某个五行色的半透明版本。 */
+export function tint(color: string, percent: number): string {
+  return `color-mix(in oklab, ${color} ${percent}%, transparent)`;
+}
+
+/** 兼容旧引用：逐字查色。 */
+export const WUXING_CHAR_COLORS: Record<string, string> = new Proxy(
+  {},
+  { get: (_t, key) => (typeof key === "string" ? ELEMENT_COLORS[elementOf(key)] : undefined) }
+) as Record<string, string>;

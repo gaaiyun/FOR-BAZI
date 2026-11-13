@@ -1,0 +1,15 @@
+{
+  "name": "玄冥 · 八字排盘",
+  "short_name": "玄冥",
+  "description": "八字排盘与解读，全部在浏览器本地计算",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e1014",
+  "theme_color": "#0e1014",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

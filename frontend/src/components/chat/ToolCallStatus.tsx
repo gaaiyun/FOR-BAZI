@@ -1,33 +1,32 @@
 /**
- * ToolCallStatus – collapsible panel showing tool call information.
+ * 工具调用记录。
  *
- * Displays tool name with icon, execution status (calling/done),
- * and an expandable area for arguments and results.
+ * AI 在解读时会调用本地工具取证（查某年干支、查古籍原文……）。这里把每次
+ * 调用列成一行小字，点开能看到参数与返回，方便核对它引用的东西是否属实。
  */
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ToolCallInfo } from "@/types/bazi";
 
-// ── Helpers ────────────────────────────────────────────────────────────
-
-/** Map tool names to friendly Chinese labels and icons. */
-const TOOL_META: Record<string, { label: string; icon: string }> = {
-  get_bazi_chart: { label: "排盘", icon: "☰" },
-  analyze_elements: { label: "五行分析", icon: "☲" },
-  analyze_ten_gods: { label: "十神分析", icon: "☵" },
-  analyze_shensha: { label: "神煞分析", icon: "☶" },
-  analyze_dayun: { label: "大运分析", icon: "☳" },
-  search_knowledge: { label: "知识检索", icon: "☴" },
-  web_search: { label: "联网搜索", icon: "☷" },
+const TOOL_LABEL: Record<string, string> = {
+  get_annual_fortune: "查流年干支",
+  get_dayun_stage: "查所在大运",
+  analyze_wuxing_balance: "查五行个数",
+  calculate_wuxing_power: "算五行力量",
+  analyze_geju: "判格局",
+  query_xing_chong_he_hai: "查刑冲合害",
+  explain_shensha: "查神煞释义",
+  fact_check_ganzhi: "核对干支",
+  query_qiongtong_guidance: "查《穷通宝鉴》",
+  query_disitian_guidance: "查《滴天髓》",
+  query_ziping_guidance: "查《子平真诠》",
+  query_sanming_guidance: "查《三命通会》",
+  query_classical_text: "检索古籍",
+  rag_retrieve: "跨书检索",
 };
 
-function getToolMeta(name: string) {
-  return TOOL_META[name] ?? { label: name, icon: "⚙" };
-}
-
-/** Format JSON string for display, with fallback. */
-function tryFormatJSON(raw: string): string {
+function pretty(raw: string): string {
   try {
     return JSON.stringify(JSON.parse(raw), null, 2);
   } catch {
@@ -35,119 +34,53 @@ function tryFormatJSON(raw: string): string {
   }
 }
 
-// ── Component ──────────────────────────────────────────────────────────
-
-interface ToolCallStatusProps {
-  toolCall: ToolCallInfo;
-  className?: string;
-}
-
-export function ToolCallStatus({ toolCall, className }: ToolCallStatusProps) {
-  const [expanded, setExpanded] = useState(false);
-  const { label, icon } = getToolMeta(toolCall.name);
-
-  const isRunning = toolCall.status === "calling";
-  const isError = toolCall.status === "error";
+export function ToolCallStatus({ toolCall, className }: { toolCall: ToolCallInfo; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const running = toolCall.status === "calling";
+  const failed = toolCall.status === "error";
 
   return (
-    <div
-      className={cn(
-        "rounded-lg border border-border bg-card transition-all",
-        isError && "border-crimson/40",
-        className
-      )}
-    >
-      {/* Header – always visible */}
+    <div className={cn("text-xs", className)}>
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className={cn(
-          "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
-          "hover:bg-muted rounded-lg cursor-pointer select-none"
-        )}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-baseline gap-2 py-1 text-left text-muted-foreground transition-colors hover:text-foreground"
       >
-        {/* Status indicator */}
-        {isRunning ? (
-          <span className="relative flex h-4 w-4 shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold opacity-60" />
-            <span className="relative inline-flex h-4 w-4 rounded-full bg-gold/80" />
-          </span>
-        ) : isError ? (
-          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-crimson/80 text-[10px] text-white">
-            !
-          </span>
-        ) : (
-          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-jade/80 text-[10px] text-background">
-            ✓
-          </span>
-        )}
-
-        {/* Icon + label */}
-        <span aria-hidden="true" className="text-base">
-          {icon}
+        <span className={cn("w-3 shrink-0", failed && "text-destructive")} aria-hidden>
+          {running ? "…" : failed ? "×" : "✓"}
         </span>
-        <span className="font-medium text-foreground">{label}</span>
-
-        {/* Status text */}
-        <span
-          className={cn(
-            "ml-auto text-xs",
-            isRunning
-              ? "text-gold"
-              : isError
-                ? "text-crimson"
-                : "text-muted-foreground"
-          )}
-        >
-          {isRunning ? "调用中..." : isError ? "调用失败" : "已完成"}
-        </span>
-
-        {/* Expand chevron */}
-        <span
-          className={cn(
-            "ml-1 text-muted-foreground transition-transform",
-            expanded && "rotate-180"
-          )}
-        >
-          ▾
-        </span>
+        <span>{TOOL_LABEL[toolCall.name] ?? toolCall.name}</span>
+        <span className="text-faint">{running ? "进行中" : failed ? "失败" : open ? "收起" : "查看"}</span>
       </button>
 
-      {/* Expandable body */}
-      {expanded && (
-        <div className="border-t border-border px-3 py-2 space-y-2">
-          {/* Arguments */}
-          {toolCall.arguments && (
-            <div>
-              <h4 className="text-xs font-medium text-muted-foreground mb-1">
-                参数
-              </h4>
-              <pre className="overflow-x-auto rounded bg-background p-2 text-xs text-foreground whitespace-pre-wrap break-all">
-                {tryFormatJSON(toolCall.arguments)}
-              </pre>
-            </div>
+      {open && (
+        <div className="mb-2 ml-5 space-y-2 border-l border-rule pl-3">
+          {toolCall.arguments && toolCall.arguments !== "{}" && (
+            <pre className="overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed text-muted-foreground">
+              {pretty(toolCall.arguments)}
+            </pre>
           )}
-
-          {/* Result */}
           {toolCall.result !== null && (
-            <div>
-              <h4 className="text-xs font-medium text-muted-foreground mb-1">
-                结果
-              </h4>
-              <pre className="overflow-x-auto rounded bg-background p-2 text-xs text-foreground whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
-                {tryFormatJSON(toolCall.result)}
-              </pre>
-            </div>
-          )}
-
-          {/* Running indicator */}
-          {isRunning && !toolCall.result && (
-            <p className="text-xs text-muted-foreground italic">
-              正在获取结果...
-            </p>
+            <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-all font-mono leading-relaxed">
+              {pretty(toolCall.result)}
+            </pre>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** 一组工具调用，带一行总述。 */
+export function ToolCallList({ toolCalls, className }: { toolCalls: ToolCallInfo[]; className?: string }) {
+  if (!toolCalls.length) return null;
+  return (
+    <div className={cn("border-l border-rule pl-3", className)}>
+      <p className="eyebrow mb-1">取证 {toolCalls.length} 次</p>
+      {toolCalls.map((tc) => (
+        <ToolCallStatus key={tc.id} toolCall={tc} />
+      ))}
     </div>
   );
 }

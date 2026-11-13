@@ -38,6 +38,10 @@ interface BaziActions {
    * Caller is responsible for navigation after success.
    */
   calculate: () => Promise<BaziReading | null>;
+  /** 切换到历史里的某份命盘，并把表单同步成它的出生信息。 */
+  openFromHistory: (id: string) => void;
+  /** 从历史里删除一份命盘。 */
+  removeFromHistory: (id: string) => void;
   /** Clear all state. */
   reset: () => void;
 }
@@ -48,7 +52,18 @@ const DEFAULT_INPUT: BaziInput = {
   gender: "male",
   time_known: true,
   calendar_type: "solar",
+  lunar_leap: false,
+  true_solar: false,
+  longitude: null,
+  place: "",
+  name: "",
 };
+
+/** 同一份命盘（同一排盘时刻与性别）只留最新一条，最多 20 条。 */
+function pushHistory(history: BaziReading[], reading: BaziReading): BaziReading[] {
+  const rest = reading.id ? history.filter((h) => h.id !== reading.id) : history;
+  return [reading, ...rest].slice(0, 20);
+}
 
 export const useBaziStore = create<BaziState & BaziActions>()(
   persist(
@@ -74,7 +89,7 @@ export const useBaziStore = create<BaziState & BaziActions>()(
 
       addToHistory: (reading) =>
         set((state) => ({
-          history: [reading, ...state.history].slice(0, 20),
+          history: pushHistory(state.history, reading),
         })),
 
       calculate: async () => {
@@ -90,7 +105,7 @@ export const useBaziStore = create<BaziState & BaziActions>()(
             reading,
             isLoading: false,
             error: null,
-            history: [reading, ...state.history].slice(0, 20),
+            history: pushHistory(state.history, reading),
           }));
           return reading;
         } catch (err: unknown) {
@@ -100,6 +115,37 @@ export const useBaziStore = create<BaziState & BaziActions>()(
           return null;
         }
       },
+
+      openFromHistory: (id) =>
+        set((state) => {
+          const hit = state.history.find((h) => h.id === id);
+          if (!hit) return {};
+          const b = hit.birth;
+          return {
+            reading: hit,
+            error: null,
+            input: b
+              ? {
+                  ...state.input,
+                  birth_date: b.input_date,
+                  birth_time: b.input_time,
+                  gender: b.gender,
+                  calendar_type: b.calendar,
+                  lunar_leap: Boolean(b.lunar_leap),
+                  true_solar: typeof b.longitude === "number",
+                  longitude: b.longitude ?? null,
+                  place: b.place ?? "",
+                  name: b.name ?? "",
+                }
+              : state.input,
+          };
+        }),
+
+      removeFromHistory: (id) =>
+        set((state) => ({
+          history: state.history.filter((h) => h.id !== id),
+          reading: state.reading?.id === id ? null : state.reading,
+        })),
 
       reset: () =>
         set({
@@ -111,6 +157,11 @@ export const useBaziStore = create<BaziState & BaziActions>()(
     }),
     {
       name: "bazi-storage",
+      // 旧版本存下的 input 缺少新字段，合并时用默认值补齐。
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<BaziState>;
+        return { ...current, ...p, input: { ...DEFAULT_INPUT, ...(p.input ?? {}) } };
+      },
       partialize: (state) => ({
         input: state.input,
         reading: state.reading,

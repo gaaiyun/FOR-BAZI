@@ -74,7 +74,7 @@ function sectionParams(c: BaziChart): string {
   ].join("\n");
 }
 
-async function ancientSection(c: BaziChart): Promise<string> {
+export async function ancientSection(c: BaziChart): Promise<string> {
   const dayMaster = (c.day_master ?? "").trim();
   const monthZhi = c.pillars?.[1]?.[1] ?? "";
   const geju = analyzeGeJu(c) as Record<string, unknown>;

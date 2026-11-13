@@ -1,40 +1,35 @@
 /**
- * Settings page (设置).
- * Configures AI provider, API keys, base URL, model, streaming,
- * and theme. Persists to useSettingsStore.
+ * 设置页（/settings）。
+ * AI 服务（默认免费模型 / 自带服务商）、外观、本地数据。
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { PageHeader, Section, Facts } from "@/components/layout/Page";
 import { useSettingsStore } from "@/stores/useSettingsStore";
-import type { AIProviderId } from "@/types/bazi";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { useBaziStore } from "@/stores/useBaziStore";
+import { useChatStore } from "@/stores/useChatStore";
+import { useAIReadingStore } from "@/stores/useAIReadingStore";
 import AccessKeyCard from "@/components/settings/AccessKeyCard";
+import type { AIProviderId, AppSettings } from "@/types/bazi";
 
 /** Provider presets: label, default model, default base URL. */
-const PROVIDER_PRESETS: Record<
-  AIProviderId,
-  { label: string; models: string[]; baseUrl: string }
-> = {
+const PROVIDER_PRESETS: Record<AIProviderId, { label: string; models: string[]; baseUrl: string }> = {
   // Workers AI models must support tool calling — the ReAct loop always
   // sends tool schemas. Models without it silently ignore the tools.
   cloudflare: {
-    label: "Cloudflare AI (免费)",
+    label: "站内免费",
     models: [
       "@cf/zai-org/glm-4.7-flash",
       "@cf/qwen/qwen3-30b-a3b-fp8",
       "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     ],
     baseUrl: "",
+  },
+  deepseek: {
+    label: "DeepSeek",
+    models: ["deepseek-chat", "deepseek-reasoner"],
+    baseUrl: "https://api.deepseek.com",
   },
   alibaba: {
     label: "阿里云百炼",
@@ -58,305 +53,208 @@ const PROVIDER_PRESETS: Record<
     models: ["mimo-v2.5-pro"],
     baseUrl: "https://token-plan-cn.xiaomimimo.com/anthropic",
   },
-  deepseek: {
-    label: "DeepSeek",
-    models: ["deepseek-chat", "deepseek-reasoner"],
-    baseUrl: "https://api.deepseek.com",
-  },
-  custom: {
-    label: "自定义",
-    models: [],
-    baseUrl: "",
-  },
+  custom: { label: "自定义", models: [], baseUrl: "" },
 };
 
 const PROVIDER_IDS = Object.keys(PROVIDER_PRESETS) as AIProviderId[];
 
-export default function Settings() {
-  const {
-    ai_provider,
-    theme,
-    setAIProvider,
-    setTheme,
-  } = useSettingsStore();
+const THEMES: Array<{ id: AppSettings["theme"]; label: string }> = [
+  { id: "system", label: "跟随系统" },
+  { id: "light", label: "昼" },
+  { id: "dark", label: "夜" },
+];
 
-  /* ── Local form state ─────────────────────────────────────────── */
+export default function Settings() {
+  const { ai_provider, theme, setAIProvider, setTheme } = useSettingsStore();
+
   const [provider, setProvider] = useState<AIProviderId>(ai_provider.provider);
   const [apiKey, setApiKey] = useState(ai_provider.api_key);
   const [model, setModel] = useState(ai_provider.model);
   const [baseUrl, setBaseUrl] = useState(ai_provider.base_url ?? "");
   const [streaming, setStreaming] = useState(ai_provider.streaming ?? true);
-  const [saved, setSaved] = useState(false);
-
-  /* ── Sync from store on mount / store change ──────────────────── */
-  useEffect(() => {
-    setProvider(ai_provider.provider);
-    setApiKey(ai_provider.api_key);
-    setModel(ai_provider.model);
-    setBaseUrl(ai_provider.base_url ?? "");
-    setStreaming(ai_provider.streaming ?? true);
-  }, [ai_provider]);
-
-  /* ── When provider changes, apply defaults ────────────────────── */
-  const handleProviderChange = (newProvider: AIProviderId) => {
-    setProvider(newProvider);
-    const preset = PROVIDER_PRESETS[newProvider];
-    setBaseUrl(preset.baseUrl);
-    if (preset.models.length > 0) {
-      setModel(preset.models[0]);
-    }
-  };
-
-  /* ── Save handler ─────────────────────────────────────────────── */
-  const handleSave = () => {
-    setAIProvider({
-      provider,
-      api_key: apiKey,
-      model,
-      base_url: baseUrl,
-      streaming,
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
 
   const preset = PROVIDER_PRESETS[provider];
+  const isFree = provider === "cloudflare";
+  const dirty =
+    provider !== ai_provider.provider ||
+    apiKey !== ai_provider.api_key ||
+    model !== ai_provider.model ||
+    baseUrl !== (ai_provider.base_url ?? "") ||
+    streaming !== (ai_provider.streaming ?? true);
+
+  const pickProvider = (id: AIProviderId) => {
+    setProvider(id);
+    const p = PROVIDER_PRESETS[id];
+    setBaseUrl(p.baseUrl);
+    setModel(p.models[0] ?? "");
+  };
+
+  const handleSave = () => {
+    if (!isFree && !apiKey.trim()) {
+      toast.error("还没有填 API Key", { description: "自带服务需要你自己的密钥；不填请选「站内免费」。" });
+      return;
+    }
+    setAIProvider({ provider, api_key: apiKey.trim(), model: model.trim(), base_url: baseUrl.trim(), streaming });
+    toast.success("设置已保存");
+  };
+
+  // 本地数据
+  const historyCount = useBaziStore((s) => s.history.length);
+  const chatCount = useChatStore((s) => s.messages.length);
+  const savedCount = useAIReadingStore((s) => Object.keys(s.saved).length);
+
+  const clearAll = () => {
+    if (!window.confirm("清除这台设备上保存的全部命盘、对话和解读？此操作不能撤销。")) return;
+    useBaziStore.getState().reset();
+    useBaziStore.setState({ history: [] });
+    useChatStore.getState().clearMessages();
+    useAIReadingStore.setState({ saved: {} });
+    toast.success("本地数据已清除");
+  };
 
   return (
-    <div className="animate-fade-in space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-gold">
-          设置 · Settings
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          配置 AI 服务商、访问密钥与外观偏好
-        </p>
-      </div>
+    <div className="animate-fade-in">
+      <PageHeader title="设置" description="排盘不需要任何设置；这里只管 AI 解读用哪家服务，以及外观。" />
 
-      <AccessKeyCard />
+      <Section title="免费额度" description="默认使用站长预配的 Cloudflare 免费模型，开箱即用。" className="border-t">
+        <AccessKeyCard />
+      </Section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* ── AI Provider Configuration ─────────────────────────── */}
-        <Card className="bg-card/60 border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground">AI Provider</CardTitle>
-            <CardDescription>
-              选择AI服务商并配置API密钥
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Provider selector */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                服务商
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {PROVIDER_IDS.map((pid) => (
-                  <Button
-                    key={pid}
-                    variant={provider === pid ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleProviderChange(pid)}
-                  >
-                    {PROVIDER_PRESETS[pid].label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <Separator />
-
-            {provider === "cloudflare" ? (
-              <div className="rounded-md bg-background border border-border p-4 space-y-2">
-                <p className="text-sm text-foreground font-medium">
-                  Cloudflare Workers AI (免费)
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  使用服务端预配置的 Cloudflare 账户，无需填写 API
-                  Key。如需切换到其他服务商，请选择上方对应按钮。
-                </p>
-              </div>
-            ) : (
-              <>
-                {/* API Key */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    API Key
-                  </label>
-                  <Input
-                    type="password"
-                    placeholder="sk-..."
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    密钥仅存储在本地浏览器中，不会上传至服务器。
-                  </p>
-                </div>
-
-                {/* Base URL */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    Base URL
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder={preset.baseUrl || "https://..."}
-                    value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                  />
-                </div>
-              </>
-            )}
-
-            {/* Model selector */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
-                模型
-              </label>
-              {preset.models.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {preset.models.map((m) => (
-                    <Button
-                      key={m}
-                      variant={model === m ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setModel(m)}
-                    >
-                      {m}
-                    </Button>
-                  ))}
-                </div>
-              ) : (
-                <Input
-                  type="text"
-                  placeholder="model-name"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                />
-              )}
-            </div>
-
-            <Separator />
-
-            {/* Streaming toggle */}
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  流式输出
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  启用后AI回复将实时显示
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={streaming}
-                onClick={() => setStreaming(!streaming)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                  streaming ? "bg-gold" : "bg-border"
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transition-transform ${
-                    streaming ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </button>
-            </div>
-
-            <Separator />
-
-            {/* Save button */}
-            <div className="flex items-center gap-3">
-              <Button onClick={handleSave}>
-                {saved ? "已保存" : "保存设置"}
-              </Button>
-              {saved && (
-                <Badge variant="default" className="text-xs animate-fade-in">
-                  设置已更新
-                </Badge>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ── Appearance & Info ─────────────────────────────────── */}
-        <div className="space-y-6">
-          <Card className="bg-card/60 border-border">
-            <CardHeader>
-              <CardTitle className="text-foreground">外观</CardTitle>
-              <CardDescription>主题与显示设置</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Theme toggle */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    暗色主题
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    当前仅支持暗色主题
-                  </p>
-                </div>
+      <Section title="AI 服务" description="自带服务时，密钥只存在本机，请求经网关转发到你选的服务商。">
+        <fieldset>
+          <legend className="eyebrow">服务商</legend>
+          <div className="no-scrollbar -mx-4 mt-1 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            <div className="seg" role="radiogroup">
+              {PROVIDER_IDS.map((id) => (
                 <button
+                  key={id}
                   type="button"
-                  role="switch"
-                  aria-checked={theme === "dark"}
-                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                    theme === "dark" ? "bg-gold" : "bg-border"
-                  }`}
+                  role="radio"
+                  aria-checked={provider === id}
+                  data-on={provider === id}
+                  onClick={() => pickProvider(id)}
                 >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transition-transform ${
-                      theme === "dark" ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
+                  {PROVIDER_PRESETS[id].label}
                 </button>
-              </div>
-            </CardContent>
-          </Card>
+              ))}
+            </div>
+          </div>
+        </fieldset>
 
-          <Card className="bg-card/60 border-border">
-            <CardHeader>
-              <CardTitle className="text-foreground">当前配置</CardTitle>
-              <CardDescription>已保存的AI配置摘要</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">服务商</span>
-                  <span className="text-foreground">
-                    {PROVIDER_PRESETS[ai_provider.provider].label}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">模型</span>
-                  <span className="text-foreground font-mono">
-                    {ai_provider.model}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">API Key</span>
-                  <span className="text-foreground font-mono">
-                    {ai_provider.api_key
-                      ? `${ai_provider.api_key.slice(0, 8)}...`
-                      : "未设置"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">流式输出</span>
-                  <span className="text-foreground">
-                    {ai_provider.streaming ? "开启" : "关闭"}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="mt-7 grid max-w-2xl gap-x-8 gap-y-6 sm:grid-cols-2">
+          {!isFree && (
+            <>
+              <label className="block">
+                <span className="eyebrow">API Key</span>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  placeholder="sk-…"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="field mt-1 font-mono"
+                />
+              </label>
+              <label className="block">
+                <span className="eyebrow">Base URL</span>
+                <input
+                  type="url"
+                  placeholder={preset.baseUrl || "https://…"}
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  className="field mt-1 font-mono"
+                />
+              </label>
+            </>
+          )}
+
+          <label className="block sm:col-span-2">
+            <span className="eyebrow">模型</span>
+            {preset.models.length > 0 ? (
+              <select className="field mt-1 font-mono" value={model} onChange={(e) => setModel(e.target.value)}>
+                {!preset.models.includes(model) && <option value={model}>{model}</option>}
+                {preset.models.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                placeholder="模型名称"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="field mt-1 font-mono"
+              />
+            )}
+            <span className="mt-2 block text-xs text-muted-foreground">
+              模型必须支持工具调用（function calling），否则查流年、查古籍这些取证步骤不会执行。
+            </span>
+          </label>
         </div>
-      </div>
+
+        <label className="mt-6 flex cursor-pointer items-center gap-2.5 text-sm">
+          <input
+            type="checkbox"
+            className="size-4 accent-[var(--foreground)]"
+            checked={streaming}
+            onChange={(e) => setStreaming(e.target.checked)}
+          />
+          边生成边显示
+        </label>
+
+        <div className="mt-7 flex items-center gap-4">
+          <button type="button" className="btn btn-primary" onClick={handleSave} disabled={!dirty}>
+            保存
+          </button>
+          {dirty && <span className="text-xs text-muted-foreground">有未保存的修改</span>}
+        </div>
+
+        <Facts
+          className="mt-8 border-t border-rule pt-6"
+          items={[
+            { k: "当前服务商", v: PROVIDER_PRESETS[ai_provider.provider].label },
+            { k: "当前模型", v: <span className="break-all font-mono text-sm">{ai_provider.model || "—"}</span> },
+            {
+              k: "API Key",
+              v: ai_provider.provider === "cloudflare" ? "不需要" : ai_provider.api_key ? "已填写" : "未填写",
+            },
+          ]}
+        />
+      </Section>
+
+      <Section title="外观">
+        <div className="seg" role="radiogroup" aria-label="主题">
+          {THEMES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="radio"
+              aria-checked={theme === t.id}
+              data-on={theme === t.id}
+              onClick={() => setTheme(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="本地数据" description="命盘、对话、解读都只存在这台设备的浏览器里，不上传。">
+        <Facts
+          items={[
+            { k: "命盘", v: <span className="tabular">{historyCount} 份</span> },
+            { k: "对话", v: <span className="tabular">{chatCount} 条</span> },
+            { k: "解读", v: <span className="tabular">{savedCount} 篇</span> },
+          ]}
+        />
+        <button type="button" className="btn btn-line btn-sm mt-6" onClick={clearAll}>
+          清除全部本地数据
+        </button>
+      </Section>
+
+      <p className="tabular border-t border-rule pt-5 text-xs text-faint">玄冥 v{__APP_VERSION__}</p>
     </div>
   );
 }

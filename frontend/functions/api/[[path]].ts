@@ -135,7 +135,9 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
   }
 
   const model = String(body.model ?? env.DEFAULT_MODEL ?? DEFAULT_MODEL);
-  const { model: _drop, ...rest } = body;
+  // 模型名单独传给 env.AI.run，其余字段原样透传
+  const rest: Record<string, unknown> = { ...body };
+  delete rest.model;
 
   try {
     const result = await env.AI.run(model, rest);

@@ -16,7 +16,7 @@ interface SettingsActions {
   /** Update the AI provider configuration. */
   setAIProvider: (config: Partial<AIProviderConfig>) => void;
   /** Set the theme. */
-  setTheme: (theme: "dark" | "light") => void;
+  setTheme: (theme: AppSettings["theme"]) => void;
   /** Set the language. */
   setLanguage: (lang: "zh" | "en") => void;
   /** Toggle settings dialog. */
@@ -33,7 +33,7 @@ const DEFAULT_SETTINGS: SettingsState = {
     base_url: "",
     streaming: true,
   },
-  theme: "dark",
+  theme: "system",
   language: "zh",
   settingsOpen: false,
 };

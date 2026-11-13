@@ -1,246 +1,191 @@
 /**
- * Ten Gods page (十神).
- * Displays the ten gods for the current chart with explanations
- * of their meaning and relationship to the Day Master.
+ * 十神页（/ten-gods）。
+ *
+ * 先看分布（比劫、食伤、财、官杀、印五类各占多少），再看每一个十神
+ * 落在哪一柱的天干或藏干，最后是命中出现的十神各自代表什么。
+ *
+ * 旧版给每个十神贴「吉 / 凶」标签，依据只是五行个数的多少，已删去：
+ * 十神本身无吉凶，喜忌要结合格局与强弱判断。
  */
 
 import { useMemo } from "react";
 import { PageHeader, Section, EmptyState } from "@/components/layout/Page";
-import { useBaziStore } from "@/stores/useBaziStore";
-import { getElementColor } from "@/lib/wuxing-colors";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { useChartView } from "@/hooks/useChartView";
+import Bars from "@/components/bazi/Bars";
+import { TEN_GOD_GROUP } from "@/lib/ganzhi";
+import { getCharColor } from "@/lib/wuxing-colors";
 
-/** Explanations for each Ten God name. */
-const TEN_GOD_EXPLANATIONS: Record<string, string> = {
-  比肩:
-    "比肩代表同我之物，主独立、自主、竞争。比肩旺者性格刚强，有主见，但易与人争。",
-  劫财:
-    "劫财代表同我之异性，主社交、义气、破耗。劫财旺者善交际，但钱财易聚易散。",
-  食神:
-    "食神代表我生之同性，主才华、口福、悠闲。食神旺者才华横溢，心态乐观，享乐人生。",
-  伤官:
-    "伤官代表我生之异性，主聪明、叛逆、创新。伤官旺者思维敏捷，不拘常规，但也易得罪人。",
-  偏财:
-    "偏财代表我克之异性，主横财、人缘、慷慨。偏财旺者财运好，出手大方，异性缘佳。",
-  正财:
-    "正财代表我克之同性，主正当收入、勤俭、务实。正财旺者脚踏实地，理财有道，但易吝啬。",
-  七杀:
-    "七杀代表克我之异性，主权力、压力、魄力。七杀旺者有领导才能，但压力大，需食神制杀。",
-  正官:
-    "正官代表克我之同性，主规矩、名声、地位。正官旺者品行端正，有官运，但过于循规蹈矩。",
-  偏印:
-    "偏印代表生我之异性，主偏门学问、孤僻、灵感。偏印旺者悟性高，好钻研偏门，但性格怪异。",
-  正印:
-    "正印代表生我之同性，主学业、慈爱、贵人。正印旺者有学问，受长辈疼爱，但易依赖他人。",
+const ORDER = ["比肩", "劫财", "食神", "伤官", "偏财", "正财", "七杀", "正官", "偏印", "正印"];
+
+const GROUP_NOTE: Record<string, string> = {
+  比劫: "同我",
+  食伤: "我生",
+  财星: "我克",
+  官杀: "克我",
+  印星: "生我",
+};
+
+/** 各十神的含义。只说它代表什么，不说好坏。 */
+const MEANING: Record<string, string> = {
+  比肩: "与日主同五行、同阴阳。代表自我、同辈、独立与主见，也代表与人分享或竞争资源。",
+  劫财: "与日主同五行、异阴阳。代表合作与争夺并存的同辈关系，行动力强，钱财进出快。",
+  食神: "日主所生、同阴阳。代表才艺、表达、口福与从容，是温和的输出。",
+  伤官: "日主所生、异阴阳。代表才华、创新与不服管束，是锋利的输出。",
+  偏财: "日主所克、同阴阳。代表流动的钱财、机会与人缘，也代表父亲。",
+  正财: "日主所克、异阴阳。代表稳定的收入、务实与经营，男命也代表妻子。",
+  七杀: "克日主、同阴阳。代表压力、挑战、魄力与权威，需有制有化方为所用。",
+  正官: "克日主、异阴阳。代表规则、职位、名誉与责任，女命也代表丈夫。",
+  偏印: "生日主、同阴阳。代表非主流的学问、直觉与独处，思路不走寻常路。",
+  正印: "生日主、异阴阳。代表学业、庇护、名分与长辈，也代表母亲。",
 };
 
 export default function TenGods() {
-  const reading = useBaziStore((s) => s.reading);
+  const { reading, view } = useChartView();
 
-  /* ── Map ten gods to their pillars ────────────────────────────── */
-  const pillarGods = useMemo(() => {
-    if (!reading) return [];
-
-    const chart = reading.chart;
-    const gods = reading.ten_gods;
-
-    // Map each pillar to its ten god information.
-    const pillars = [
-      { label: "年柱", pillar: chart.year_pillar },
-      { label: "月柱", pillar: chart.month_pillar },
-      { label: "日柱", pillar: chart.day_pillar },
-      { label: "时柱", pillar: chart.hour_pillar },
-    ];
-
-    return pillars.map((p, i) => {
-      // The ten_gods array may have entries for stem and branch of each pillar.
-      // We try to match by character.
-      const stemGod = gods.find(
-        (g) => g.character === p.pillar.stem
-      );
-      const branchGod = gods.find(
-        (g) => g.character === p.pillar.branch
-      );
-
-      // Also check pillar_annotations if available.
-      const annotations = reading.pillar_annotations;
-      const key = ["year", "month", "day", "hour"][i];
-      const ann = annotations?.[key];
-
-      return {
-        label: p.label,
-        pillar: p.pillar,
-        stemTenGod: stemGod?.name ?? ann?.ten_god_gan ?? "—",
-        branchTenGod: branchGod?.name ?? ann?.ten_god_zhi ?? "—",
-        stemGod,
-        branchGod,
-        isDayMaster: i === 2, // Day pillar is the Day Master
-      };
-    });
-  }, [reading]);
-
-  /* ── Collect unique ten gods with their details ───────────────── */
-  const uniqueGods = useMemo(() => {
-    if (!reading) return [];
-    const seen = new Set<string>();
-    const result: Array<{
-      name: string;
-      element: string;
-      isFavorable: boolean;
-      explanation: string;
-    }> = [];
-
-    for (const god of reading.ten_gods) {
-      if (!seen.has(god.name)) {
-        seen.add(god.name);
-        result.push({
-          name: god.name,
-          element: god.element,
-          isFavorable: god.is_favorable,
-          explanation: TEN_GOD_EXPLANATIONS[god.name] ?? "暂无解释。",
+  /** 每个十神出现在哪些位置 */
+  const positions = useMemo(() => {
+    const map: Record<string, Array<{ where: string; char: string; hidden: boolean }>> = {};
+    for (const p of view?.pillars ?? []) {
+      const short = p.label[0];
+      if (p.key !== "day" && p.stemGod) {
+        (map[p.stemGod] ??= []).push({ where: `${short}干`, char: p.stem, hidden: false });
+      }
+      p.hidden.forEach((h, i) => {
+        if (!h.god) return;
+        (map[h.god] ??= []).push({
+          where: `${short}支${p.branch}${["本气", "中气", "余气"][i] ?? ""}`,
+          char: h.stem,
+          hidden: true,
         });
-      }
+      });
     }
+    return map;
+  }, [view]);
 
-    // If we have no ten_gods from API, derive from annotations.
-    if (result.length === 0 && reading.pillar_annotations) {
-      for (const key of ["year", "month", "day", "hour"]) {
-        const ann = reading.pillar_annotations[key];
-        if (ann) {
-          for (const godName of [ann.ten_god_gan, ann.ten_god_zhi]) {
-            if (godName && !seen.has(godName)) {
-              seen.add(godName);
-              result.push({
-                name: godName,
-                element: "",
-                isFavorable: true,
-                explanation: TEN_GOD_EXPLANATIONS[godName] ?? "暂无解释。",
-              });
-            }
-          }
-        }
-      }
-    }
-
-    return result;
-  }, [reading]);
-
-  /* ── No data state ────────────────────────────────────────────── */
-  if (!reading) {
+  if (!reading || !view) {
     return (
       <div className="animate-fade-in">
-        <PageHeader title="十神" en="Ten Gods" description="日主与其余干支的生克关系及其含义" />
+        <PageHeader title="十神" description="日主与其余干支的生克关系。" />
         <EmptyState />
       </div>
     );
   }
 
+  const present = ORDER.filter((g) => positions[g]?.length);
+  const absent = ORDER.filter((g) => !positions[g]?.length);
+  const total = view.godGroups.reduce((s, g) => s + g.weight, 0) || 1;
+
   return (
-    <div className="animate-fade-in space-y-6">
-      <PageHeader title="十神" en="Ten Gods" description="日主与其余干支的生克关系及其含义" />
+    <div className="animate-fade-in">
+      <PageHeader
+        title="十神"
+        description={
+          <>
+            以日主{" "}
+            <span className="font-heading font-semibold" style={{ color: getCharColor(view.dayMaster) }}>
+              {view.dayMaster}
+            </span>{" "}
+            为中心，其余天干与地支藏干按生克和阴阳各得一个十神。
+          </>
+        }
+      />
 
-      {/* ── Pillar-to-Ten-God mapping ───────────────────────────── */}
-      <Section
-        title="四柱十神"
-        description={`日主 ${reading.chart.day_master}（${reading.chart.day_master_element}）`}
-      >
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {pillarGods.map((pg) => (
-              <div
-                key={pg.label}
-                className={`rounded-lg border p-4 ${
-                  pg.isDayMaster
-                    ? "border-gold/50 bg-gold/5"
-                    : "border-border bg-background/60"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    {pg.label}
-                  </span>
-                  {pg.isDayMaster && (
-                    <Badge variant="default" className="text-[10px]">
-                      日主
-                    </Badge>
-                  )}
-                </div>
-                {/* Stem and branch with ten god labels */}
-                <div className="mt-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="text-xl font-heading font-bold"
-                      style={{ color: getElementColor(pg.pillar.element) }}
-                    >
-                      {pg.pillar.stem}
-                    </span>
-                    <Badge variant="outline" className="text-xs">
-                      {pg.stemTenGod}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="text-xl font-heading font-bold"
-                      style={{ color: getElementColor(pg.pillar.element) }}
-                    >
-                      {pg.pillar.branch}
-                    </span>
-                    <Badge variant="outline" className="text-xs">
-                      {pg.branchTenGod}
-                    </Badge>
-                  </div>
-                </div>
-                {/* Hidden stems */}
-                {pg.pillar.hidden_stems && pg.pillar.hidden_stems.length > 0 && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    藏干: {pg.pillar.hidden_stems.join(" ")}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        </Section>
+      <div className="border-t border-foreground pt-8 lg:grid lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-x-8">
+        <div className="mb-5 lg:mb-0">
+          <h2 className="font-heading text-lg font-semibold">分布</h2>
+          <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground lg:pr-2">
+            天干计 1，藏干按本气 0.6、中气 0.3、余气 0.1 计。
+          </p>
+        </div>
+        <Bars
+          rows={view.godGroups.map((g) => ({
+            key: g.group,
+            label: g.group,
+            value: g.weight,
+            display: `${((g.weight / total) * 100).toFixed(0)}%`,
+            note: g.members.length ? `${GROUP_NOTE[g.group]} · ${g.members.join("、")}` : `${GROUP_NOTE[g.group]} · 不见`,
+          }))}
+        />
+      </div>
 
-      {/* ── Detailed explanations ───────────────────────────────── */}
-      <Section title="十神详解" description="命中出现的十神及其含义">
-          {uniqueGods.length > 0 ? (
-            <div className="space-y-4">
-              {uniqueGods.map((god, i) => (
-                <div key={god.name}>
-                  {i > 0 && <Separator className="mb-4" />}
-                  <div className="flex items-start gap-4">
-                    <div className="shrink-0">
-                      <Badge
-                        variant={god.isFavorable ? "default" : "destructive"}
-                        className="text-sm px-3 py-1"
-                      >
-                        {god.name}
-                      </Badge>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      {god.element && (
-                        <p className="text-sm text-muted-foreground mb-1">
-                          五行:{" "}
-                          <span style={{ color: getElementColor(god.element) }}>
-                            {god.element}
+      <Section className="mt-10" title="落宫" description="每一柱的天干十神与地支藏干十神。">
+        <div className="overflow-x-auto">
+          <table className="ledger min-w-[26rem]">
+            <thead>
+              <tr>
+                <th />
+                {view.pillars.map((p) => (
+                  <th key={p.key}>
+                    <span className="text-foreground">{p.label}</span>
+                    <span className="ml-1.5 hidden sm:inline">{p.palace}</span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="whitespace-nowrap text-xs text-muted-foreground">天干</td>
+                {view.pillars.map((p) => (
+                  <td key={p.key}>
+                    <span className="font-heading text-xl font-semibold" style={{ color: getCharColor(p.stem) }}>
+                      {p.stem}
+                    </span>
+                    <span className={p.key === "day" ? "ml-2 text-primary" : "ml-2"}>{p.stemGod}</span>
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <td className="whitespace-nowrap text-xs text-muted-foreground">地支</td>
+                {view.pillars.map((p) => (
+                  <td key={p.key} className="align-top">
+                    <span className="font-heading text-xl font-semibold" style={{ color: getCharColor(p.branch) }}>
+                      {p.branch}
+                    </span>
+                    <ul className="mt-1.5 space-y-0.5">
+                      {p.hidden.map((h) => (
+                        <li key={h.stem} className="whitespace-nowrap">
+                          <span className="font-heading font-semibold" style={{ color: getCharColor(h.stem) }}>
+                            {h.stem}
                           </span>
-                          {god.isFavorable ? "（喜）" : "（忌）"}
-                        </p>
-                      )}
-                      <p className="text-sm text-foreground leading-relaxed">
-                        {god.explanation}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                          <span className="ml-1.5 text-muted-foreground">{h.god}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      <Section
+        title="命中十神"
+        description={absent.length ? `不见：${absent.join("、")}。` : "十神俱全。"}
+      >
+        <dl>
+          {present.map((g) => (
+            <div key={g} className="border-b border-rule py-5 first:pt-0 last:border-b-0 last:pb-0">
+              <dt className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                <span className="font-heading text-xl font-semibold">{g}</span>
+                <span className="text-xs text-muted-foreground">{TEN_GOD_GROUP[g]}</span>
+                <span className="text-sm">
+                  {positions[g].map((x, i) => (
+                    <span key={i} className={x.hidden ? "text-muted-foreground" : ""}>
+                      {i > 0 && "、"}
+                      <span className="font-heading font-semibold" style={{ color: getCharColor(x.char) }}>
+                        {x.char}
+                      </span>{" "}
+                      {x.where}
+                    </span>
+                  ))}
+                </span>
+              </dt>
+              <dd className="mt-2 max-w-2xl text-[0.9375rem] leading-[1.9] text-muted-foreground">{MEANING[g]}</dd>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              暂无十神数据。请确保已进行排盘计算。
-            </p>
-          )}
-        </Section>
+          ))}
+        </dl>
+      </Section>
     </div>
   );
 }

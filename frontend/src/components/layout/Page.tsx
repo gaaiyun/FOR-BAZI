@@ -1,45 +1,38 @@
 /**
  * 页面骨架。
  *
- * 之前每个页面各写各的标题块（字号、间距、副标题语气都不一致），
- * 加上一半是英文一半中文。这里统一成三个部件：
- *   PageHeader  —— 标题 + 一句中文说明 + 右侧操作位
- *   Section     —— 带细金线的内容分区
- *   EmptyState  —— 未排盘等空态，给出明确的下一步而不是一句"暂无数据"
+ * 全站只有三种版面部件，都不带框：
+ *   PageHeader —— 宋体大标题 + 一行事实性说明 + 右侧操作
+ *   Section    —— 顶上一条墨线；宽屏时栏目名在左栏，内容在右
+ *   EmptyState —— 未排盘时的去向
  */
 
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 export function PageHeader({
   title,
-  en,
   description,
   actions,
 }: {
-  title: string;
+  title: ReactNode;
+  /** 兼容旧调用，不再显示英文副题 */
   en?: string;
-  description?: string;
+  description?: ReactNode;
   actions?: ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border/60 pb-5">
-      <div>
-        <div className="flex items-baseline gap-2.5">
-          <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">
-            {title}
-          </h1>
-          {en && (
-            <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground/70">
-              {en}
-            </span>
-          )}
-        </div>
+    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 pb-8 sm:pb-10">
+      <div className="min-w-0">
+        <h1 className="font-heading text-[2rem] font-semibold leading-tight tracking-tight sm:text-[2.5rem]">
+          {title}
+        </h1>
         {description && (
-          <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{description}</p>
         )}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="no-print flex flex-wrap items-center gap-2">{actions}</div>}
     </header>
   );
 }
@@ -49,40 +42,59 @@ export function Section({
   description,
   actions,
   children,
-  className = "",
+  className,
+  flush = false,
 }: {
-  title?: string;
-  description?: string;
+  title?: ReactNode;
+  description?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** 不要左栏，标题叠在内容上方 */
+  flush?: boolean;
 }) {
   return (
-    <section className={`surface-panel rounded-xl p-5 sm:p-6 ${className}`}>
-      {(title || actions) && (
-        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            {title && (
-              <h2 className="rule-accent font-heading text-base font-semibold text-foreground">
-                {title}
-              </h2>
-            )}
-            {description && (
-              <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-            )}
+    <section
+      className={cn(
+        "border-t border-foreground py-6 sm:py-8",
+        !flush && "lg:grid lg:grid-cols-[10rem_minmax(0,1fr)] lg:gap-x-8",
+        className
+      )}
+    >
+      {(title || description || actions) && (
+        <div className={cn("mb-5", !flush && "lg:mb-0")}>
+          <div className="flex items-baseline justify-between gap-3 lg:block">
+            {title && <h2 className="font-heading text-lg font-semibold leading-snug">{title}</h2>}
+            {actions && <div className="lg:mt-3">{actions}</div>}
           </div>
-          {actions}
+          {description && (
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground lg:pr-2">{description}</p>
+          )}
         </div>
       )}
-      {children}
+      <div className="min-w-0">{children}</div>
     </section>
   );
 }
 
-/** 空态。默认引导回排盘页——绝大多数空态都是因为还没排盘。 */
+/** 一组「标签 + 值」，用细线隔开而不是装进格子。 */
+export function Facts({ items, className }: { items: Array<{ k: string; v: ReactNode }>; className?: string }) {
+  return (
+    <dl className={cn("flex flex-wrap gap-x-8 gap-y-4", className)}>
+      {items.map((it) => (
+        <div key={it.k} className="min-w-[4.5rem]">
+          <dt className="text-xs text-muted-foreground">{it.k}</dt>
+          <dd className="mt-1 text-[0.9375rem]">{it.v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** 空态。绝大多数空态都是因为还没排盘。 */
 export function EmptyState({
-  title = "尚未排盘",
-  description = "请先在排盘页填写出生信息，本页会自动带出对应内容。",
+  title = "还没有命盘",
+  description = "先填写出生信息排一份盘，这一页的内容会随之带出。",
   action = true,
 }: {
   title?: string;
@@ -90,28 +102,11 @@ export function EmptyState({
   action?: boolean;
 }) {
   return (
-    <div className="surface-panel flex flex-col items-center gap-3 rounded-xl px-6 py-14 text-center">
-      <svg aria-hidden viewBox="0 0 64 40" className="h-10 w-16">
-        <g fill="var(--primary)" opacity="0.22">
-          <rect x="2" y="2" width="60" height="5" rx="2.5" />
-          <rect x="2" y="13" width="25" height="5" rx="2.5" />
-          <rect x="37" y="13" width="25" height="5" rx="2.5" />
-          <rect x="2" y="24" width="60" height="5" rx="2.5" />
-          <rect x="2" y="35" width="25" height="5" rx="2.5" />
-          <rect x="37" y="35" width="25" height="5" rx="2.5" />
-        </g>
-      </svg>
-      <div>
-        <p className="font-heading text-base font-medium text-foreground">{title}</p>
-        <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-          {description}
-        </p>
-      </div>
+    <div className="border-t border-foreground py-14">
+      <p className="font-heading text-xl font-semibold">{title}</p>
+      <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">{description}</p>
       {action && (
-        <Link
-          to="/"
-          className="mt-1 rounded-lg bg-gold px-4 py-2 text-sm font-medium text-background transition-colors duration-[var(--dur-fast)] hover:bg-gold/85"
-        >
+        <Link to="/" className="btn btn-primary mt-6">
           去排盘
         </Link>
       )}

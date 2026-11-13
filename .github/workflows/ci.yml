@@ -47,7 +47,7 @@ jobs:
           python -c "import sys; sys.path.insert(0, '.'); import data.text_service; print('[OK] data.text_service import')"
 
   # ---------------------------------------------------------------------------
-  # 完整测试套件（尽力而为）：452 项测试依赖重型包
+  # 完整测试套件（尽力而为）：506 项测试依赖重型包
   # （lunar-python / fastapi / chromadb / sentence-transformers / torch 等）。
   # 这些包在 CI 上体积大、安装慢、偶发不稳定，故本 job 标记为 continue-on-error，
   # 其成败【不】作为 CI 必过门禁——真正的门禁是上面的 lint-compile。

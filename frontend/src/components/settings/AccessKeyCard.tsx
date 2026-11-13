@@ -1,16 +1,14 @@
 /**
- * 访问密钥与免费额度。
+ * 免费额度与访问密钥。
  *
- * 三种访问模式在这里对用户可见：
- *   匿名     -> 每日限次，用站长的 Cloudflare 免费额度
- *   持密钥   -> 不限次，仍用站长的额度
- *   自带 key -> 用自己的服务商额度，不限次，也不消耗站长的
+ * 三种用法在这里对用户可见：
+ *   匿名     —— 每日限次，用站长的 Cloudflare 免费额度
+ *   持密钥   —— 不限次，仍用站长的额度
+ *   自带服务 —— 用自己的服务商额度，不限次，也不消耗站长的
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { fetchQuota, getAccessKey, setAccessKey } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 interface Quota {
   mode: string;
@@ -20,29 +18,42 @@ interface Quota {
   remaining?: number;
 }
 
+/** 查额度。连不上或返回的不是额度对象时给 null。 */
+async function queryQuota(): Promise<Quota | null> {
+  try {
+    const q = await fetchQuota();
+    // 本地开发时网关不在，/api/quota 会返回 HTML 或 404，一并当作连不上
+    return q && typeof q === "object" && "mode" in q ? q : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function AccessKeyCard() {
-  const [key, setKey] = useState("");
+  const [key, setKey] = useState(() => getAccessKey());
   const [saved, setSaved] = useState(false);
   const [quota, setQuota] = useState<Quota | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<"loading" | "ok" | "error">("loading");
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setQuota(await fetchQuota());
-    } catch {
-      setError("无法连接 AI 网关，请稍后重试。");
-    } finally {
-      setLoading(false);
-    }
+  const apply = useCallback((q: Quota | null) => {
+    setQuota(q);
+    setState(q ? "ok" : "error");
   }, []);
 
+  const refresh = useCallback(async () => {
+    setState("loading");
+    apply(await queryQuota());
+  }, [apply]);
+
   useEffect(() => {
-    setKey(getAccessKey());
-    void refresh();
-  }, [refresh]);
+    let alive = true;
+    void queryQuota().then((q) => {
+      if (alive) apply(q);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [apply]);
 
   const handleSave = async () => {
     setAccessKey(key.trim());
@@ -54,115 +65,69 @@ export default function AccessKeyCard() {
   const unlimited = quota?.unlimited === true;
   const remaining = quota?.remaining ?? 0;
   const limit = quota?.limit ?? 0;
-  const pct = limit > 0 ? Math.max(0, Math.min(100, (remaining / limit) * 100)) : 0;
 
   return (
-    <section className="rounded-xl border border-border/80 bg-card/60 backdrop-blur-sm p-6 space-y-5">
-      <header className="space-y-1">
-        <h2 className="font-heading text-base font-semibold text-foreground">
-          访问密钥与免费额度
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          默认使用站长预配置的 Cloudflare 免费 AI，无需任何设置即可试用
-        </p>
-      </header>
-
-      {/* 额度状态 */}
-      <div className="rounded-lg border border-border/70 bg-background/40 p-4">
-        {loading ? (
-          <div className="h-10 animate-shimmer rounded" />
-        ) : error ? (
-          <p className="text-sm text-destructive">{error}</p>
+    <div>
+      <div aria-live="polite">
+        {state === "loading" ? (
+          <p className="text-sm text-muted-foreground">正在查询额度…</p>
+        ) : state === "error" ? (
+          <p className="text-sm text-muted-foreground">
+            暂时连不上 AI 网关，查不到额度。
+            <button type="button" className="link ml-2" onClick={() => void refresh()}>
+              重试
+            </button>
+          </p>
         ) : unlimited ? (
-          <div className="flex items-center gap-3">
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-gold/15 text-gold">
-              ✓
-            </span>
-            <div>
-              <p className="text-sm font-medium text-gold">密钥已生效 · 不限次数</p>
-              <p className="text-xs text-muted-foreground">当前使用站长的 Workers AI 额度</p>
-            </div>
-          </div>
+          <p className="text-[0.9375rem]">
+            <span className="font-heading text-2xl font-semibold">不限次数</span>
+            <span className="ml-3 text-sm text-muted-foreground">访问密钥已生效</span>
+          </p>
         ) : (
-          <div className="space-y-2.5">
-            <div className="flex items-baseline justify-between">
-              <span className="text-sm text-muted-foreground">今日免费额度</span>
-              <span className="font-mono text-sm">
-                <span
-                  className={
-                    remaining === 0
-                      ? "text-destructive font-semibold"
-                      : "text-foreground font-semibold"
-                  }
-                >
-                  {remaining}
-                </span>
-                <span className="text-muted-foreground"> / {limit} 次</span>
+          <div>
+            <p className="flex items-baseline gap-2">
+              <span className={`tabular font-heading text-4xl font-semibold ${remaining === 0 ? "text-destructive" : ""}`}>
+                {remaining}
               </span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-border/60">
+              <span className="tabular text-sm text-muted-foreground">/ {limit} 次，今日剩余</span>
+            </p>
+            <div className="mt-3 h-1.5 max-w-xs bg-wash">
               <div
-                className="h-full rounded-full transition-[width] duration-[var(--dur-slow)] ease-[var(--ease-out-expo)]"
+                className="h-full transition-[width] duration-[var(--dur-slow)]"
                 style={{
-                  width: `${pct}%`,
-                  background:
-                    remaining === 0
-                      ? "var(--destructive)"
-                      : "linear-gradient(90deg, #d4af37, #e8c95f)",
+                  width: `${limit > 0 ? Math.max(0, Math.min(100, (remaining / limit) * 100)) : 0}%`,
+                  background: remaining === 0 ? "var(--destructive)" : "var(--foreground)",
                 }}
               />
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
               {remaining === 0
-                ? "今日免费次数已用完。填入下方密钥，或在上方改用自己的 AI 服务商。"
-                : "按 IP 每日重置。填入密钥可解除限制。"}
+                ? "今日免费次数已用完。可以填访问密钥，改用自己的 AI 服务，或把命盘复制给自己的 AI。"
+                : "匿名使用按 IP 每日重置。填入访问密钥可解除限制。"}
             </p>
           </div>
         )}
       </div>
 
-      {/* 密钥输入 */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">访问密钥</label>
-        <div className="flex gap-2">
-          <Input
-            type="password"
-            placeholder="bazi_..."
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            className="font-mono"
-          />
-          <Button onClick={handleSave} className="shrink-0">
-            {saved ? "已保存" : "保存"}
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          密钥只存在你的浏览器里，不会上传。留空并保存即可清除。
-        </p>
-      </div>
-
-      {/* 三种模式说明 */}
-      <div className="grid gap-2 text-xs sm:grid-cols-3">
-        {[
-          { t: "匿名", d: `每日 ${limit || 5} 次`, active: !unlimited },
-          { t: "持密钥", d: "不限次数", active: unlimited },
-          { t: "自带 Key", d: "用自己的额度", active: false },
-        ].map((m) => (
-          <div
-            key={m.t}
-            className={`rounded-lg border p-3 ${
-              m.active
-                ? "border-gold/40 bg-gold/5"
-                : "border-border/60 bg-background/30"
-            }`}
-          >
-            <p className={`font-medium ${m.active ? "text-gold" : "text-foreground"}`}>
-              {m.t}
-            </p>
-            <p className="mt-0.5 text-muted-foreground">{m.d}</p>
+      <div className="mt-7 max-w-md">
+        <label className="block">
+          <span className="eyebrow">访问密钥</span>
+          <div className="mt-1 flex items-end gap-3">
+            <input
+              type="password"
+              autoComplete="off"
+              placeholder="bazi_…"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              className="field font-mono"
+            />
+            <button type="button" onClick={() => void handleSave()} className="btn btn-line btn-sm shrink-0">
+              {saved ? "已保存" : "保存"}
+            </button>
           </div>
-        ))}
+        </label>
+        <p className="mt-2 text-xs text-muted-foreground">只存在你的浏览器里。留空并保存即清除。</p>
       </div>
-    </section>
+    </div>
   );
 }

@@ -119,6 +119,12 @@ export interface BaziReading {
   summary: string;
   /** Gender label from the backend (e.g. "乾造 (Male)" or "坤造 (Female)"). */
   gender?: string;
+  /** 本地生成的命盘标识，用于历史记录去重与切换 */
+  id?: string;
+  /** 排盘时间戳（毫秒） */
+  created_at?: number;
+  /** 出生信息与换算过程 */
+  birth?: BirthRecord;
 
   // ── Extended fields from POST /api/v1/chart ──────────────────
   /**
@@ -160,6 +166,38 @@ export interface BaziInput {
   time_known: boolean;
   /** Optional: solar or lunar calendar */
   calendar_type?: "solar" | "lunar";
+  /** 农历输入时，该月是否为闰月 */
+  lunar_leap?: boolean;
+  /** 是否按出生地经度做真太阳时校正 */
+  true_solar?: boolean;
+  /** 出生地东经（度） */
+  longitude?: number | null;
+  /** 出生地名称，仅用于展示 */
+  place?: string;
+  /** 称呼或备注，用于区分多份命盘 */
+  name?: string;
+}
+
+/** 一份命盘对应的出生信息与换算过程，随命盘一起保存。 */
+export interface BirthRecord {
+  name?: string;
+  gender: "male" | "female";
+  calendar: "solar" | "lunar";
+  /** 用户填写的原始日期与时间 */
+  input_date: string;
+  input_time: string;
+  lunar_leap?: boolean;
+  /** 公历钟表时间，YYYY-MM-DD HH:mm */
+  clock: string;
+  /** 实际排盘所用时间（真太阳时校正后；未校正则同 clock） */
+  effective: string;
+  /** 对应的农历日期文字 */
+  lunar_text: string;
+  place?: string;
+  longitude?: number | null;
+  offset_minutes: number;
+  dst: boolean;
+  notes: string[];
 }
 
 /** Tool call information embedded in an assistant message. */
@@ -215,7 +253,7 @@ export interface ShenShaItem {
 /** Application settings. */
 export interface AppSettings {
   ai_provider: AIProviderConfig;
-  theme: "dark" | "light";
+  theme: "system" | "dark" | "light";
   language: "zh" | "en";
 }
 

@@ -8,11 +8,14 @@ import axios, { type AxiosInstance, type AxiosResponse } from "axios";
 import type {
   BaziInput,
   BaziReading,
+  BirthRecord,
   ChatStreamRequest,
   ApiError,
 } from "@/types/bazi";
 import { adaptChartResponse } from "@/lib/response-adapter";
 import { calculateChart } from "@/engine";
+import { Solar } from "lunar-typescript";
+import { resolveBirth, formatDateTime } from "@/lib/solar-time";
 import { runReactLoop } from "@/lib/react-agent";
 
 /**
@@ -20,7 +23,7 @@ import { runReactLoop } from "@/lib/react-agent";
  * Vite proxy. We detect this and point API calls directly at the backend.
  * In dev mode (localhost:5173) the Vite proxy handles /api → localhost:8000.
  */
-const isTauri = "__TAURI_INTERNALS__" in window;
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 const API_BASE = isTauri ? "http://127.0.0.1:8000/api" : "/api";
 const HEALTH_BASE = isTauri ? "http://127.0.0.1:8000/health" : "/health";
@@ -60,13 +63,40 @@ client.interceptors.response.use(
  * against the Python one by `src/engine/parity.test.ts`.
  */
 export async function calculateBazi(input: BaziInput): Promise<BaziReading> {
-  const datetimeStr = `${input.birth_date} ${input.birth_time}`;
+  // 农历转公历、夏令时、真太阳时都在这里换算好，引擎只接收最终时刻。
+  const resolved = resolveBirth(input);
   // Engine expects exactly "乾造 (Male)" or "坤造 (Female)".
   const genderLabel = input.gender === "male" ? "乾造 (Male)" : "坤造 (Female)";
-  const data = calculateChart(datetimeStr, genderLabel);
+  const data = calculateChart(formatDateTime(resolved.effective), genderLabel);
+  const e = resolved.effective;
+  const lunar = Solar.fromYmdHms(
+    e.getFullYear(), e.getMonth() + 1, e.getDate(), e.getHours(), e.getMinutes(), 0
+  ).getLunar();
+  const birth: BirthRecord = {
+    name: input.name?.trim() || undefined,
+    gender: input.gender,
+    calendar: input.calendar_type ?? "solar",
+    input_date: input.birth_date,
+    input_time: input.birth_time,
+    lunar_leap: input.lunar_leap,
+    clock: formatDateTime(resolved.clock),
+    effective: formatDateTime(resolved.effective),
+    lunar_text: `${lunar.getYearInGanZhi()}年${lunar.getMonthInChinese()}月${lunar.getDayInChinese()}`,
+    place: input.true_solar ? input.place : undefined,
+    longitude: input.true_solar ? input.longitude : undefined,
+    offset_minutes: resolved.offsetMinutes,
+    dst: resolved.dst,
+    notes: resolved.notes,
+  };
   // Adapt flat engine output → nested frontend BaziReading，
   // 同时把引擎原件带上，供 Agent 工具直接使用。
-  return { ...adaptChartResponse(data as never), engine_chart: data.chart };
+  return {
+    ...adaptChartResponse(data as never),
+    engine_chart: data.chart,
+    birth,
+    id: `${birth.effective}|${birth.gender}`,
+    created_at: Date.now(),
+  };
 }
 
 // ── AI Chat / Analysis ──────────────────────────────────────────────

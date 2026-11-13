@@ -1,407 +1,243 @@
 /**
- * AI Reading page (AI 解读) – automated Bazi analysis.
+ * 解读页（/ai-reading）。
  *
- * Features:
- * - Button to trigger full bazi analysis
- * - SSE streaming with token accumulation
- * - Shows analysis sections as they stream in
- * - Tool call status for each tool used
- * - Fact-check warnings
+ * 选一个主题，让 AI 在算好的命盘上写一篇解读。正文按长文排版（宋体、
+ * 宽行距），取证过程折在正文上方。结果按「命盘 + 主题」存在本地，
+ * 刷新或切走再回来还在；可以复制、存成文件或打印。
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { PageHeader, EmptyState } from "@/components/layout/Page";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { cn } from "@/lib/utils";
 import { useBaziStore } from "@/stores/useBaziStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
+import { useAIReadingStore } from "@/stores/useAIReadingStore";
 import { useChatSSE } from "@/hooks/useChatSSE";
-import { ToolCallStatus } from "@/components/chat/ToolCallStatus";
-import { Button } from "@/components/ui/button";
-import type { ChatMessage, ToolCallInfo } from "@/types/bazi";
+import { Markdown } from "@/components/chat/Markdown";
+import { ToolCallList } from "@/components/chat/ToolCallStatus";
+import { CopyChartButton } from "@/components/bazi/CopyChart";
+import { copyText, downloadText } from "@/lib/clipboard";
 
-// ── Analysis Prompt ────────────────────────────────────────────────────
+const THIS_YEAR = new Date().getFullYear();
 
-const ANALYSIS_PROMPT = `请对以下命盘进行全面的八字分析，包括：
-1. 命盘格局总论（日主强弱、格局类型）
-2. 五行喜忌分析
-3. 十神分析与性格特征
-4. 大运走势概述
-5. 事业、财运、感情、健康方面的解读
-6. 开运建议
+const TOPICS = [
+  {
+    id: "full",
+    label: "完整解读",
+    note: "格局、性格、事业、感情、健康、当前运势，篇幅最长",
+    prompt: `请对这份命盘做一次完整解读，依次说明：
+1. 格局与日主强弱，以及由此得出的喜用与忌神（说明取用依据）
+2. 性格与天赋
+3. 事业与财运
+4. 感情与婚姻
+5. 健康上需要留意的方面
+6. 当前大运与今明两年流年的重点
+要求：直接引用命盘里的干支、十神、刑冲合害作为依据；结论分清把握大小；不要用恐吓式的说法。`,
+  },
+  {
+    id: "career",
+    label: "事业财运",
+    note: "适合的方向、求财方式、近几年的节奏",
+    prompt: `请只谈事业与财运：
+1. 从格局、十神看适合的行业方向与工作方式（受雇、合伙还是独立）
+2. 财星与日主的关系，求财靠什么
+3. 当前大运对事业的影响，以及 ${THIS_YEAR}、${THIS_YEAR + 1} 两年各自的重点
+引用命盘里的干支和十神作为依据，结论分清把握大小。`,
+  },
+  {
+    id: "love",
+    label: "感情婚姻",
+    note: "配偶宫、配偶星、相处模式与时间点",
+    prompt: `请只谈感情与婚姻：
+1. 日支（配偶宫）与配偶星的状态，以及它们受到的刑冲合害
+2. 在亲密关系里的相处模式与需要留意的地方
+3. 大运流年中感情变动较明显的时间段
+引用命盘里的干支和十神作为依据，结论分清把握大小，不要下「克夫」「克妻」这类断语。`,
+  },
+  {
+    id: "year",
+    label: `${THIS_YEAR + 1} 年`,
+    note: "明年的流年与原局、大运的作用",
+    prompt: `请只谈 ${THIS_YEAR + 1} 年的流年：
+1. 先调用工具确认该年干支，再说明它对日主是什么十神
+2. 它与原局四柱、与当前大运之间的合冲刑害
+3. 落到事业、财务、感情、健康上各自的重点，以及上半年与下半年的差别
+引用具体干支作为依据，结论分清把握大小。`,
+  },
+] as const;
 
-请用专业的命理术语，同时保持通俗易懂。`;
+type TopicId = (typeof TOPICS)[number]["id"];
 
-// ── Component ──────────────────────────────────────────────────────────
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 export default function AIReading() {
   const reading = useBaziStore((s) => s.reading);
   const provider = useSettingsStore((s) => s.ai_provider);
+  const { saved, save, remove } = useAIReadingStore();
 
-  const [analysisContent, setAnalysisContent] = useState("");
-  const [analysisToolCalls, setAnalysisToolCalls] = useState<ToolCallInfo[]>([]);
-  const [factCheckWarnings, setFactCheckWarnings] = useState<string[]>([]);
-  const [hasRun, setHasRun] = useState(false);
+  const [topic, setTopic] = useState<TopicId>("full");
+  // 正在生成的是哪个主题：生成中切换主题不应把流式内容显示到别的主题下
+  const [running, setRunning] = useState<TopicId | null>(null);
 
-  // Track the completed messages from the hook.
-  const messagesRef = useRef<ChatMessage[]>([]);
-
-  const handleComplete = useCallback((msg: ChatMessage) => {
-    messagesRef.current = [...messagesRef.current, msg];
-  }, []);
-
-  const {
-    isStreaming,
-    tokens,
-    status,
-    toolCalls,
-    error,
-    sendMessage,
-    abort,
-  } = useChatSSE({
+  const { isStreaming, tokens, status, toolCalls, error, sendMessage, abort } = useChatSSE({
     provider,
     chartData: reading,
     history: [],
-    onComplete: handleComplete,
   });
 
-  // ── Sync tool calls to local state ────────────────────────────────
+  const key = `${reading?.id ?? "none"}::${topic}`;
+  const stored = saved[key];
+  const live = isStreaming && running === topic;
+  const content = live ? tokens : (stored?.content ?? "");
+  const calls = live ? toolCalls : (stored?.toolCalls ?? []);
+  const meta = TOPICS.find((t) => t.id === topic)!;
 
-  useEffect(() => {
-    setAnalysisToolCalls(toolCalls);
-  }, [toolCalls]);
-
-  // ── Trigger analysis ──────────────────────────────────────────────
-
-  const handleStartAnalysis = useCallback(async () => {
+  const start = useCallback(async () => {
     if (!reading) return;
-
-    // Reset state.
-    setAnalysisContent("");
-    setAnalysisToolCalls([]);
-    setFactCheckWarnings([]);
-    setHasRun(true);
-    messagesRef.current = [];
-
-    const result = await sendMessage(ANALYSIS_PROMPT);
-
-    if (result) {
-      // Extract any fact-check warnings from the content.
-      const warnings: string[] = [];
-      const warningPattern = /(?:⚠️|警告|注意)[：:]\s*(.+)/g;
-      let match;
-      while ((match = warningPattern.exec(result.content)) !== null) {
-        warnings.push(match[1]);
-      }
-      setFactCheckWarnings(warnings);
+    // 发起时就定下存档键：生成结束时用户可能已经切到别的主题
+    const k = `${reading.id ?? "none"}::${topic}`;
+    setRunning(topic);
+    const msg = await sendMessage(TOPICS.find((t) => t.id === topic)!.prompt);
+    setRunning(null);
+    if (msg?.content) {
+      save(k, { content: msg.content, toolCalls: msg.tool_calls ?? [], at: Date.now(), model: provider.model });
     }
-  }, [reading, sendMessage]);
+  }, [reading, topic, sendMessage, save, provider.model]);
 
-  // ── Update content as tokens stream in ─────────────────────────────
+  // 离开页面时中止，避免后台继续消耗
+  useEffect(() => abort, [abort]);
 
-  useEffect(() => {
-    if (isStreaming && tokens) {
-      setAnalysisContent(tokens);
-    }
-  }, [isStreaming, tokens]);
+  if (!reading) {
+    return (
+      <div className="animate-fade-in">
+        <PageHeader title="解读" description="让 AI 在算好的命盘上写一篇解读。" />
+        <EmptyState description="解读需要先有一份命盘，AI 才有东西可依据。" />
+      </div>
+    );
+  }
 
-  // ── Render ────────────────────────────────────────────────────────
+  const busyElsewhere = isStreaming && running !== topic;
 
   return (
-    <div className="animate-fade-in max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <PageHeader
-          title="AI 解读"
-          en="AI Reading"
-          description="在算好的命盘上做解读；引用流年与古籍时必须调用工具取证"
-        />
+    <div className="animate-fade-in">
+      <PageHeader
+        title="解读"
+        description="命盘由程序算好交给 AI，它只负责解读；引用流年干支和古籍原文时会先调用本地工具核对。"
+      />
+
+      {/* ── 主题 ─────────────────────────────────────────────── */}
+      <div className="no-print border-t border-foreground pt-5">
+        <div className="no-scrollbar -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <div className="seg" role="tablist" aria-label="解读主题">
+            {TOPICS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={topic === t.id}
+                data-on={topic === t.id}
+                onClick={() => setTopic(t.id)}
+              >
+                {t.label}
+                {saved[`${reading.id ?? "none"}::${t.id}`] && topic !== t.id && (
+                  <span className="ml-1 text-faint" aria-label="已有结果">
+                    ·
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="mt-3 text-sm text-muted-foreground">{meta.note}</p>
+
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
+          {live ? (
+            <button type="button" className="btn btn-line" onClick={abort}>
+              停止
+            </button>
+          ) : (
+            <button type="button" className="btn btn-primary" onClick={() => void start()} disabled={busyElsewhere}>
+              {stored ? "重新解读" : "开始解读"}
+            </button>
+          )}
+          {live && <span className="caret text-sm text-muted-foreground">{status || "正在准备"}</span>}
+          {busyElsewhere && <span className="text-sm text-muted-foreground">另一个主题正在生成，稍等。</span>}
+          {!live && stored && (
+            <span className="tabular text-xs text-muted-foreground">
+              {formatTime(stored.at)} · {stored.model}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* No chart state */}
-      {!reading && <EmptyState description="AI 解读需要先有命盘。请先在排盘页填写出生信息。" />}
-
-      {/* Chart loaded but no analysis yet */}
-      {reading && !hasRun && !isStreaming && (
-        <div className="rounded-xl border border-border bg-background p-8 text-center space-y-4">
-          <span className="block text-4xl text-gold/90">☱</span>
-          <h3 className="font-heading text-lg text-gold">
-            准备就绪
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            命盘已排好，点击下方按钮开始 AI 全面解读。
-            分析将包括格局总论、五行喜忌、十神性格、大运走势等方面。
+      {/* ── 出错 ─────────────────────────────────────────────── */}
+      {error && !isStreaming && (
+        <div role="alert" className="mt-8 border-l border-destructive pl-4">
+          <p className="text-sm text-destructive">{error}</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            可以稍后再试，或到{" "}
+            <Link to="/settings" className="link">
+              设置
+            </Link>{" "}
+            换一个 AI 服务；也可以把命盘复制出去，交给自己的 AI。
           </p>
-          <Button
-            onClick={handleStartAnalysis}
-            className="bg-gold text-background hover:bg-gold/80 font-medium px-6"
-          >
-            开始 AI 解读
-          </Button>
+          <CopyChartButton compact className="mt-3" />
         </div>
       )}
 
-      {/* Analysis in progress or completed */}
-      {(hasRun || isStreaming) && reading && (
-        <div className="space-y-4">
-          {/* Control bar */}
-          <div className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3">
-            <div className="flex items-center gap-3">
-              {isStreaming ? (
-                <>
-                  <span className="relative flex h-3 w-3">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-gold opacity-60" />
-                    <span className="relative inline-flex h-3 w-3 rounded-full bg-gold" />
-                  </span>
-                  <span className="text-sm text-gold animate-pulse">
-                    {status || "正在分析..."}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="h-3 w-3 rounded-full bg-jade" />
-                  <span className="text-sm text-muted-foreground">
-                    分析完成
-                  </span>
-                </>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              {isStreaming && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={abort}
-                  className="border-crimson/40 text-crimson hover:bg-crimson/10"
-                >
-                  停止
-                </Button>
-              )}
-              {!isStreaming && hasRun && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleStartAnalysis}
-                  className="border-gold/40 text-gold hover:bg-gold/10"
-                >
-                  重新分析
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Tool calls */}
-          {analysisToolCalls.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-medium text-muted-foreground px-1">
-                工具调用
-              </h3>
-              {analysisToolCalls.map((tc) => (
-                <ToolCallStatus key={tc.id} toolCall={tc} />
-              ))}
-            </div>
+      {/* ── 正文 ─────────────────────────────────────────────── */}
+      {(content || calls.length > 0) && (
+        <article className="mt-10 border-t border-rule pt-8">
+          <ToolCallList toolCalls={calls} className="no-print mb-8" />
+          {content && (
+            <Markdown streaming={live} className="max-w-[42rem]">
+              {content}
+            </Markdown>
           )}
 
-          {/* Fact-check warnings */}
-          {factCheckWarnings.length > 0 && (
-            <div className="rounded-xl border border-gold/30 bg-gold/5 p-4">
-              <h3 className="text-sm font-medium text-gold mb-2">
-                ⚠️ 注意事项
-              </h3>
-              <ul className="space-y-1">
-                {factCheckWarnings.map((w, i) => (
-                  <li key={i} className="text-xs text-gold/80">
-                    {w}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Analysis content */}
-          {analysisContent ? (
-            <div className="rounded-xl border border-border bg-card p-6">
-              <div className="prose-sm max-w-none text-foreground">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    h1: ({ children, ...props }: React.ComponentProps<"h1">) => (
-                      <h1
-                        className="font-heading text-xl font-semibold text-gold mb-3 mt-6 first:mt-0 border-b border-border pb-2"
-                        {...props}
-                      >
-                        {children}
-                      </h1>
-                    ),
-                    h2: ({ children, ...props }: React.ComponentProps<"h2">) => (
-                      <h2
-                        className="font-heading text-lg font-semibold text-gold mb-2 mt-5 first:mt-0"
-                        {...props}
-                      >
-                        {children}
-                      </h2>
-                    ),
-                    h3: ({ children, ...props }: React.ComponentProps<"h3">) => (
-                      <h3
-                        className="font-heading text-base font-semibold text-foreground mb-2 mt-4 first:mt-0"
-                        {...props}
-                      >
-                        {children}
-                      </h3>
-                    ),
-                    p: ({ children, ...props }: React.ComponentProps<"p">) => (
-                      <p className="mb-3 leading-relaxed text-sm" {...props}>
-                        {children}
-                      </p>
-                    ),
-                    ul: ({ children, ...props }: React.ComponentProps<"ul">) => (
-                      <ul
-                        className="list-disc list-inside mb-3 space-y-1 text-sm"
-                        {...props}
-                      >
-                        {children}
-                      </ul>
-                    ),
-                    ol: ({ children, ...props }: React.ComponentProps<"ol">) => (
-                      <ol
-                        className="list-decimal list-inside mb-3 space-y-1 text-sm"
-                        {...props}
-                      >
-                        {children}
-                      </ol>
-                    ),
-                    li: ({ children, ...props }: React.ComponentProps<"li">) => (
-                      <li className="leading-relaxed" {...props}>
-                        {children}
-                      </li>
-                    ),
-                    blockquote: ({
-                      children,
-                      ...props
-                    }: React.ComponentProps<"blockquote">) => (
-                      <blockquote
-                        className="border-l-2 border-gold pl-3 mb-3 text-muted-foreground italic"
-                        {...props}
-                      >
-                        {children}
-                      </blockquote>
-                    ),
-                    code: ({
-                      className,
-                      children,
-                      ...props
-                    }: React.ComponentProps<"code">) => {
-                      const isBlock = className?.includes("language-");
-                      if (isBlock) {
-                        return (
-                          <pre className="mb-3 rounded-lg bg-background border border-border p-3 overflow-x-auto">
-                            <code
-                              className={cn(
-                                "text-xs text-foreground",
-                                className
-                              )}
-                              {...props}
-                            >
-                              {children}
-                            </code>
-                          </pre>
-                        );
-                      }
-                      return (
-                        <code
-                          className="rounded bg-muted px-1.5 py-0.5 text-xs text-gold font-mono"
-                          {...props}
-                        >
-                          {children}
-                        </code>
-                      );
-                    },
-                    strong: ({
-                      children,
-                      ...props
-                    }: React.ComponentProps<"strong">) => (
-                      <strong className="font-semibold text-gold" {...props}>
-                        {children}
-                      </strong>
-                    ),
-                    table: ({
-                      children,
-                      ...props
-                    }: React.ComponentProps<"table">) => (
-                      <div className="mb-3 overflow-x-auto">
-                        <table
-                          className="w-full text-sm border-collapse border border-border"
-                          {...props}
-                        >
-                          {children}
-                        </table>
-                      </div>
-                    ),
-                    th: ({
-                      children,
-                      ...props
-                    }: React.ComponentProps<"th">) => (
-                      <th
-                        className="border border-border bg-muted px-3 py-2 text-left text-xs font-medium text-gold"
-                        {...props}
-                      >
-                        {children}
-                      </th>
-                    ),
-                    td: ({
-                      children,
-                      ...props
-                    }: React.ComponentProps<"td">) => (
-                      <td
-                        className="border border-border px-3 py-2 text-xs"
-                        {...props}
-                      >
-                        {children}
-                      </td>
-                    ),
-                    hr: ({ ...props }: React.ComponentProps<"hr">) => (
-                      <hr className="my-4 border-border" {...props} />
-                    ),
-                  }}
-                >
-                  {analysisContent}
-                </ReactMarkdown>
-              </div>
-
-              {/* Streaming cursor */}
-              {isStreaming && (
-                <span className="inline-block h-4 w-0.5 bg-gold animate-pulse ml-0.5 align-middle" />
-              )}
-            </div>
-          ) : (
-            isStreaming && (
-              <div className="rounded-xl border border-border bg-card p-8 text-center">
-                <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                  <span className="h-2 w-2 rounded-full bg-gold animate-bounce [animation-delay:0ms]" />
-                  <span className="h-2 w-2 rounded-full bg-gold animate-bounce [animation-delay:150ms]" />
-                  <span className="h-2 w-2 rounded-full bg-gold animate-bounce [animation-delay:300ms]" />
-                  <span className="ml-2 text-sm">正在生成分析...</span>
-                </div>
-              </div>
-            )
-          )}
-
-          {/* Error */}
-          {error && (
-            <div className="rounded-xl border border-crimson/40 bg-crimson/10 px-4 py-3 text-sm text-crimson">
-              <p className="font-medium">分析出错</p>
-              <p className="text-xs text-crimson/80 mt-1">{error}</p>
+          {!live && stored && (
+            <div className="no-print mt-10 flex flex-wrap gap-x-5 gap-y-2 border-t border-rule pt-5 text-sm">
               <button
                 type="button"
-                onClick={handleStartAnalysis}
-                className="mt-2 text-xs text-gold hover:underline"
+                className="link"
+                onClick={async () => {
+                  if (await copyText(stored.content)) toast.success("已复制全文");
+                }}
               >
-                重试
+                复制全文
+              </button>
+              <button
+                type="button"
+                className="link"
+                onClick={() => downloadText(`八字解读-${meta.label}.md`, stored.content)}
+              >
+                存为文件
+              </button>
+              <button type="button" className="link" onClick={() => window.print()}>
+                打印
+              </button>
+              <Link to="/chat" className="link">
+                接着追问
+              </Link>
+              <button type="button" className="ml-auto text-faint hover:text-destructive" onClick={() => remove(key)}>
+                删除这篇
               </button>
             </div>
           )}
+        </article>
+      )}
+
+      {/* ── 还没有结果 ─────────────────────────────────────────── */}
+      {!content && !live && !error && (
+        <div className="mt-12 max-w-xl border-t border-rule pt-8 text-sm leading-relaxed text-muted-foreground">
+          <p>一次解读大约需要半分钟到一分钟。默认使用站内的免费模型，每天有次数限制。</p>
+          <p className="mt-2">想用更强的模型，可以在设置里填自己的服务，或者把命盘整份复制给自己常用的 AI：</p>
+          <CopyChartButton compact className="mt-4" />
         </div>
       )}
     </div>

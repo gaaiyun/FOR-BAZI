@@ -1,5 +1,11 @@
-/* Google Fonts: Noto Serif SC for Chinese characters */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap');
+/*
+  思源宋体自托管。400 与 600 两个字重用 fontsource 的分片版：每个字重切成
+  一百来片、各带 unicode-range，浏览器只下载页面上真正出现的那几片。
+  （整包版每个字重 1.5 MB，手机上不可接受。）
+  干支大字另有一个只含几十个字的 900 字重子集，见下方 @font-face。
+*/
+@import "@fontsource/noto-serif-sc/400.css";
+@import "@fontsource/noto-serif-sc/600.css";
 
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -8,15 +14,27 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 干支、五行、站名共 29 个字的 900 字重子集，由 scripts/subset_glyph_font.py 生成 */
+@font-face {
+  font-family: "Ming Glyph";
+  font-style: normal;
+  font-weight: 900;
+  font-display: block;
+  src: url("./assets/fonts/ming-glyph-900.woff2") format("woff2");
+}
+
 /* ---------------------------------------------------
-   Tailwind v4 @theme: register all design tokens
+   设计方向：命书。
+
+   一张命盘本来就是一页表格——四列干支，逐行注解。所以整站不用卡片，
+   用细线分栏、留白分段；干支用重磅宋体做主角，其余文字退到无衬线小字。
+   颜色只有墨色与一种朱砂；五行色只落在干支字上，不做底色和边条。
    --------------------------------------------------- */
 @theme inline {
-  --font-heading: 'Noto Serif SC', serif;
-  --font-sans: 'Geist Variable', 'Noto Serif SC', sans-serif;
-  --font-serif: 'Noto Serif SC', serif;
+  --font-heading: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-serif: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-sans: 'Geist Variable', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
 
-  /* Mystical dark theme colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -36,14 +54,18 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Custom Bazi / Wuxing colors */
-  --color-gold: #d4af37;
-  --color-jade: #50c878;
-  --color-silver: #c0c0c0;
-  --color-crimson: #e94560;
-  --color-azure: #4a90d9;
+  /* 语义色 */
+  --color-faint: var(--faint);
+  --color-rule: var(--rule);
+  --color-wash: var(--wash);
 
-  /* Sidebar tokens (required by shadcn sidebar) */
+  /* 五行 */
+  --color-wood: var(--wx-wood);
+  --color-fire: var(--wx-fire);
+  --color-earth: var(--wx-earth);
+  --color-metal: var(--wx-metal);
+  --color-water: var(--wx-water);
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -53,294 +75,455 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Chart tokens */
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
+  --color-chart-1: var(--wx-wood);
+  --color-chart-2: var(--wx-fire);
+  --color-chart-3: var(--wx-earth);
+  --color-chart-4: var(--wx-metal);
+  --color-chart-5: var(--wx-water);
 
-  /* Radius scale */
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  --radius-2xl: 8px;
+  --radius-3xl: 12px;
+  --radius-4xl: 16px;
 }
 
-/* ---------------------------------------------------
-   CSS Custom Properties – Light (unused but required
-   by shadcn; the app is dark-only)
-   --------------------------------------------------- */
+/* 昼：冷调的纸与墨 */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #f4f5f7;
+  --foreground: #15171b;
+  --faint: #8a9099;
+  --rule: #d5d8de;
+  --wash: #eaecf0;
+
+  --card: #f4f5f7;
+  --card-foreground: #15171b;
+  --popover: #fbfbfc;
+  --popover-foreground: #15171b;
+  --primary: #b3321d;
+  --primary-foreground: #fbfbfc;
+  --secondary: #eaecf0;
+  --secondary-foreground: #15171b;
+  --muted: #eaecf0;
+  --muted-foreground: #5d636d;
+  --accent: #eaecf0;
+  --accent-foreground: #15171b;
+  --destructive: #b3321d;
+  --border: #d5d8de;
+  --input: #c4c8d0;
+  --ring: #15171b;
+  --radius: 4px;
+
+  --wx-wood: #2c7a4b;
+  --wx-fire: #c23a1f;
+  --wx-earth: #96701c;
+  --wx-metal: #6a7280;
+  --wx-water: #1f5fa8;
+
+  --sidebar: #f4f5f7;
+  --sidebar-foreground: #15171b;
+  --sidebar-primary: #b3321d;
+  --sidebar-primary-foreground: #fbfbfc;
+  --sidebar-accent: #eaecf0;
+  --sidebar-accent-foreground: #15171b;
+  --sidebar-border: #d5d8de;
+  --sidebar-ring: #15171b;
+
+  --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur-base: 240ms;
+  --dur-slow: 480ms;
+
+  color-scheme: light;
 }
 
-/* ---------------------------------------------------
-   Mystical Dark Theme – the default for this app
-   --------------------------------------------------- */
+/* 夜：墨底 */
 .dark {
-  --background: #0d1117;
-  --foreground: #e6edf3;
-  --card: rgba(22, 27, 34, 0.6);
-  --card-foreground: #e6edf3;
-  --popover: #161b22;
-  --popover-foreground: #e6edf3;
-  --primary: #d4af37;
-  --primary-foreground: #0d1117;
-  --secondary: #1c2128;
-  --secondary-foreground: #e6edf3;
-  --muted: #1c2128;
-  --muted-foreground: #8b949e;
-  --accent: #1c2128;
-  --accent-foreground: #e6edf3;
-  --destructive: #e94560;
-  --border: #30363d;
-  --input: #30363d;
-  --ring: #d4af37;
-  --chart-1: #d4af37;
-  --chart-2: #50c878;
-  --chart-3: #4a90d9;
-  --chart-4: #e94560;
-  --chart-5: #c0c0c0;
-  --sidebar: #0d1117;
-  --sidebar-foreground: #e6edf3;
-  --sidebar-primary: #d4af37;
-  --sidebar-primary-foreground: #0d1117;
-  --sidebar-accent: #1c2128;
-  --sidebar-accent-foreground: #e6edf3;
-  --sidebar-border: #30363d;
-  --sidebar-ring: #d4af37;
+  --background: #0e1014;
+  --foreground: #e9eaed;
+  --faint: #6b717b;
+  --rule: #262a31;
+  --wash: #171a1f;
+
+  --card: #0e1014;
+  --card-foreground: #e9eaed;
+  --popover: #15181d;
+  --popover-foreground: #e9eaed;
+  --primary: #e5583f;
+  --primary-foreground: #0e1014;
+  --secondary: #171a1f;
+  --secondary-foreground: #e9eaed;
+  --muted: #171a1f;
+  --muted-foreground: #9aa0aa;
+  --accent: #1c2026;
+  --accent-foreground: #e9eaed;
+  --destructive: #e5583f;
+  --border: #262a31;
+  --input: #343943;
+  --ring: #e9eaed;
+
+  --wx-wood: #62c08a;
+  --wx-fire: #f06a50;
+  --wx-earth: #d8aa4c;
+  --wx-metal: #c3c8d0;
+  --wx-water: #62a4e8;
+
+  --sidebar: #0e1014;
+  --sidebar-foreground: #e9eaed;
+  --sidebar-primary: #e5583f;
+  --sidebar-primary-foreground: #0e1014;
+  --sidebar-accent: #171a1f;
+  --sidebar-accent-foreground: #e9eaed;
+  --sidebar-border: #262a31;
+  --sidebar-ring: #e9eaed;
+
+  color-scheme: dark;
 }
 
-/* ---------------------------------------------------
-   Base layer overrides
-   --------------------------------------------------- */
 @layer base {
   * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-family: 'Noto Serif SC', 'Geist Variable', serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-
-    /*
-      纯平的 #0d1117 会让所有卡片都像贴纸。这里叠两层极淡的径向光晕
-      （金／靛），给页面一个隐约的光源方向，卡片的边框和阴影才站得住。
-      固定不随滚动移动，避免视觉噪声。
-    */
-    background-image:
-      radial-gradient(120ch 60ch at 15% -10%, rgb(212 175 55 / 0.055), transparent 60%),
-      radial-gradient(100ch 50ch at 95% 0%, rgb(74 144 217 / 0.045), transparent 55%);
-    background-attachment: fixed;
-    background-repeat: no-repeat;
+    @apply border-border;
   }
   html {
     @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior-y: none;
   }
 
-  /* 数字与干支用等宽对齐，表格里不会跳动 */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* iOS 上小于 16px 的输入框聚焦时会把整页放大 */
+  input, select, textarea {
+    font-size: 16px;
+  }
+  @media (min-width: 640px) {
+    input, select, textarea {
+      font-size: 0.9375rem;
+    }
+  }
+
+  input[type="date"], input[type="time"] {
+    color-scheme: inherit;
+    min-height: 2.75rem;
+  }
+}
+
+@layer components {
+  /* 数字等宽对齐 */
   .tabular {
     font-variant-numeric: tabular-nums;
   }
-}
 
-/* ---------------------------------------------------
-   表面层级
-
-   卡片不再各自硬编码颜色。三档表面对应三种语义：
-   panel  —— 常规内容块
-   raised —— 需要被注意的主对象（如四柱卡）
-   inset  —— 嵌在其他表面里的次级块
-   --------------------------------------------------- */
-@layer components {
-  .surface-panel {
-    background: color-mix(in oklab, var(--card) 92%, transparent);
-    border: 1px solid var(--border);
-    box-shadow: var(--elev-1);
-    backdrop-filter: blur(8px);
+  /* 栏目小标题：无衬线小字，靠字距而不是颜色区分 */
+  .eyebrow {
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    color: var(--muted-foreground);
   }
 
-  .surface-raised {
-    background:
-      linear-gradient(180deg, rgb(255 255 255 / 0.025), transparent 40%),
-      color-mix(in oklab, var(--card) 96%, transparent);
-    border: 1px solid var(--border);
-    box-shadow: var(--elev-2);
-    backdrop-filter: blur(10px);
+  /* 干支大字 */
+  .glyph {
+    font-family: "Ming Glyph", var(--font-heading);
+    font-weight: 900;
+    line-height: 1;
   }
 
-  .surface-inset {
-    background: rgb(0 0 0 / 0.22);
-    border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
-    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.25);
+  /* 表单控件：只有一条底线 */
+  .field {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--input);
+    border-radius: 0;
+    padding: 0.5rem 0;
+    color: var(--foreground);
+    outline: none;
+    transition: border-color var(--dur-fast);
+  }
+  .field:hover {
+    border-bottom-color: var(--muted-foreground);
+  }
+  .field:focus {
+    border-bottom-color: var(--foreground);
+    box-shadow: 0 1px 0 0 var(--foreground);
+  }
+  .field::placeholder {
+    color: var(--faint);
+  }
+  select.field {
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+      linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+    background-position: calc(100% - 9px) 55%, calc(100% - 4px) 55%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 1.5rem;
+    min-height: 2.75rem;
+  }
+  select.field option {
+    background: var(--popover);
+    color: var(--popover-foreground);
   }
 
-  /* 可交互卡片：hover 时抬起并让金色描边浮现 */
-  .card-interactive {
-    transition:
-      transform var(--dur-base) var(--ease-out-quart),
-      box-shadow var(--dur-base) var(--ease-out-quart),
-      border-color var(--dur-base) var(--ease-out-quart);
+  /* 主按钮：实心墨块；次按钮：细线框 */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 1.25rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    border-radius: 2px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast), opacity var(--dur-fast);
   }
-  .card-interactive:hover {
-    transform: translateY(-2px);
-    border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
-    box-shadow: var(--elev-3);
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--foreground);
+    color: var(--background);
+  }
+  /* 悬停变色只给有鼠标的设备：触屏上 :hover 会在点按后一直留着 */
+  @media (hover: hover) {
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary);
+      color: var(--primary-foreground);
+    }
+  }
+  .btn-primary:active:not(:disabled) {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .btn-line {
+    border-color: var(--input);
+    color: var(--foreground);
+  }
+  .btn-line:hover:not(:disabled) {
+    border-color: var(--foreground);
+  }
+  .btn-sm {
+    min-height: 2.25rem;
+    padding: 0 0.875rem;
+    font-size: 0.8125rem;
   }
 
-  /* 章节标题上方的细金线，用来分段而不靠粗分隔线 */
-  .rule-accent::before {
+  /* 文字链接式操作 */
+  .link {
+    color: var(--foreground);
+    text-decoration: underline;
+    text-decoration-color: var(--input);
+    text-underline-offset: 0.3em;
+    transition: text-decoration-color var(--dur-fast), color var(--dur-fast);
+    cursor: pointer;
+  }
+  .link:hover {
+    color: var(--primary);
+    text-decoration-color: var(--primary);
+  }
+
+  /* 分段选择：一排文字，选中项下面一条墨线 */
+  .seg {
+    display: inline-flex;
+    gap: 1.25rem;
+  }
+  .seg > button, .seg > label {
+    position: relative;
+    padding: 0.5rem 0;
+    font-size: 0.9375rem;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color var(--dur-fast);
+  }
+  .seg > button:hover, .seg > label:hover {
+    color: var(--foreground);
+  }
+  .seg > [data-on="true"] {
+    color: var(--foreground);
+    font-weight: 500;
+  }
+  .seg > [data-on="true"]::after {
     content: "";
-    display: block;
-    width: 2rem;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
     height: 2px;
-    margin-bottom: 0.75rem;
-    border-radius: 999px;
-    background: linear-gradient(90deg, var(--primary), transparent);
+    background: var(--foreground);
   }
+
+  /* 数据表：只有横线 */
+  .ledger {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  .ledger th {
+    text-align: left;
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+    padding: 0.5rem 0.75rem 0.5rem 0;
+    border-bottom: 1px solid var(--foreground);
+    white-space: nowrap;
+  }
+  .ledger td {
+    padding: 0.625rem 0.75rem 0.625rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: baseline;
+  }
+  .ledger tr:last-child td {
+    border-bottom: 0;
+  }
+
+  /* AI 输出的长文排版 */
+  .prose-ming {
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    line-height: 1.95;
+    color: var(--foreground);
+    overflow-wrap: anywhere;
+  }
+  .prose-ming > *:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+  .prose-ming h1, .prose-ming h2 {
+    font-weight: 600;
+    font-size: 1.25rem;
+    line-height: 1.4;
+    margin: 2.25rem 0 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--rule);
+  }
+  .prose-ming h3, .prose-ming h4 {
+    font-weight: 600;
+    font-size: 1.0625rem;
+    margin: 1.5rem 0 0.5rem;
+  }
+  .prose-ming p { margin: 0 0 1rem; }
+  .prose-ming > p:last-child { margin-bottom: 0; }
+  .prose-ming ul, .prose-ming ol { margin: 0 0 1rem; padding-left: 1.4em; }
+  .prose-ming ul { list-style: disc; }
+  .prose-ming ol { list-style: decimal; }
+  .prose-ming li { margin: 0.25rem 0; }
+  .prose-ming li::marker { color: var(--faint); }
+  .prose-ming strong { font-weight: 600; }
+  .prose-ming blockquote {
+    margin: 0 0 1rem;
+    padding-left: 1em;
+    color: var(--muted-foreground);
+    border-left: 1px solid var(--foreground);
+  }
+  .prose-ming hr { border: 0; border-top: 1px solid var(--rule); margin: 1.75rem 0; }
+  .prose-ming a { text-decoration: underline; text-underline-offset: 0.3em; }
+  .prose-ming code {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    background: var(--wash);
+    padding: 0.1em 0.35em;
+    border-radius: 2px;
+  }
+  .prose-ming pre {
+    background: var(--wash);
+    padding: 0.875rem 1rem;
+    margin: 0 0 1rem;
+    overflow-x: auto;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+  }
+  .prose-ming pre code { background: none; padding: 0; }
+  .prose-ming .table-wrap { overflow-x: auto; margin: 0 0 1rem; }
+  .prose-ming table {
+    border-collapse: collapse;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    min-width: 100%;
+  }
+  .prose-ming th {
+    text-align: left;
+    font-weight: 500;
+    padding: 0.5rem 1rem 0.5rem 0;
+    border-bottom: 1px solid var(--foreground);
+    white-space: nowrap;
+  }
+  .prose-ming td {
+    padding: 0.5rem 1rem 0.5rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .prose-ming.is-compact { font-size: 0.9375rem; line-height: 1.85; }
 }
 
 /* ---------------------------------------------------
-   Motion system
-
-   Two rules keep this from feeling synthetic:
-   1. Decorative motion never loops. Anything that moves
-      forever reads as a screensaver, not a product.
-   2. Motion is a response to something — entrance, hover,
-      state change — and it resolves. It does not idle.
+   动效：只在进入和状态变化时出现，播完即止
    --------------------------------------------------- */
-:root {
-  /* Authored easings. `ease-out` on everything is the tell. */
-  --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-in-out-quart: cubic-bezier(0.77, 0, 0.175, 1);
-  /* Slight overshoot — used sparingly, for elements that "land". */
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-
-  --dur-fast: 140ms;
-  --dur-base: 240ms;
-  --dur-slow: 420ms;
-
-  /* Layered elevation: ambient occlusion + key light + hairline.
-     A single arbitrary glow is what makes cards look pasted on. */
-  --elev-1:
-    0 1px 2px rgb(0 0 0 / 0.28),
-    0 0 0 1px rgb(255 255 255 / 0.03) inset;
-  --elev-2:
-    0 2px 4px rgb(0 0 0 / 0.24),
-    0 8px 16px -6px rgb(0 0 0 / 0.36),
-    0 0 0 1px rgb(255 255 255 / 0.04) inset;
-  --elev-3:
-    0 4px 8px rgb(0 0 0 / 0.22),
-    0 16px 32px -10px rgb(0 0 0 / 0.44),
-    0 0 0 1px rgb(255 255 255 / 0.05) inset;
-}
-
 @keyframes rise-in {
-  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
   to   { opacity: 1; transform: translate3d(0, 0, 0); }
 }
-
-@keyframes settle-in {
-  from { opacity: 0; transform: translate3d(0, 14px, 0) scale(0.985); }
-  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+@keyframes ink-in {
+  from { opacity: 0; transform: translate3d(0, 0.18em, 0); filter: blur(6px); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); }
+}
+@keyframes draw-x {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes blink {
+  50% { opacity: 0; }
 }
 
-@keyframes sweep {
-  from { background-position: -150% 0; }
-  to   { background-position: 250% 0; }
-}
-
-/* Page / section entrance. */
 .animate-fade-in {
   animation: rise-in var(--dur-slow) var(--ease-out-quart) both;
 }
 
-/*
-  Staggered entrance for grids and lists. Put `.stagger` on the
-  container; each child gets its own delay from its index.
-  Capped at 8 so a long list never crawls in.
-*/
-.stagger > * {
-  animation: settle-in var(--dur-slow) var(--ease-out-expo) both;
+/* 干支逐字落墨：四柱依次显现 */
+.ink > * {
+  animation: ink-in 700ms var(--ease-out-expo) both;
 }
-.stagger > *:nth-child(1) { animation-delay: 0ms; }
-.stagger > *:nth-child(2) { animation-delay: 45ms; }
-.stagger > *:nth-child(3) { animation-delay: 90ms; }
-.stagger > *:nth-child(4) { animation-delay: 135ms; }
-.stagger > *:nth-child(5) { animation-delay: 180ms; }
-.stagger > *:nth-child(6) { animation-delay: 225ms; }
-.stagger > *:nth-child(7) { animation-delay: 270ms; }
-.stagger > *:nth-child(n + 8) { animation-delay: 315ms; }
+.ink > *:nth-child(1) { animation-delay: 60ms; }
+.ink > *:nth-child(2) { animation-delay: 150ms; }
+.ink > *:nth-child(3) { animation-delay: 240ms; }
+.ink > *:nth-child(4) { animation-delay: 330ms; }
+.ink > *:nth-child(5) { animation-delay: 420ms; }
 
-/* Loading placeholder. Finite by nature — it stops when data lands. */
-.animate-shimmer {
-  background: linear-gradient(
-    90deg,
-    transparent 20%,
-    rgb(212 175 55 / 0.08) 50%,
-    transparent 80%
-  );
-  background-size: 200% 100%;
-  animation: sweep 1.6s var(--ease-in-out-quart) infinite;
+.draw-x {
+  transform-origin: left center;
+  animation: draw-x 800ms var(--ease-out-expo) both;
 }
 
-/* ---------------------------------------------------
-   Focus visibility — keyboard users get a real ring,
-   mouse users do not. Missing focus states are the
-   single most common production-readiness gap.
-   --------------------------------------------------- */
-@layer base {
-  :focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
-    border-radius: calc(var(--radius) * 0.5);
-  }
+.caret::after,
+.prose-ming.is-streaming > *:last-child::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 0.15em;
+  vertical-align: -0.12em;
+  background: var(--primary);
+  animation: blink 1s steps(1) infinite;
 }
 
-/* ---------------------------------------------------
-   Respect the OS setting. Non-negotiable for shipping.
-   --------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -348,28 +531,31 @@
   }
 }
 
-/* ---------------------------------------------------
-   Scrollbar styling for the mystical theme
-   --------------------------------------------------- */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* 滚动条 */
+@media (hover: hover) {
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--rule);
+    border: 3px solid var(--background);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--faint); }
 }
-::-webkit-scrollbar-track {
-  background: #0d1117;
-}
-::-webkit-scrollbar-thumb {
-  background: #30363d;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #484f58;
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* 提示条是反色的（墨底），副文案跟随正文色并略淡，否则昼夜两套下都看不清 */
+.cn-toast [data-description] {
+  color: inherit !important;
+  opacity: 0.72;
 }
 
-/* ---------------------------------------------------
-   Selection color
-   --------------------------------------------------- */
 ::selection {
-  background: rgba(212, 175, 55, 0.3);
-  color: #e6edf3;
+  background: color-mix(in oklab, var(--primary) 22%, transparent);
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
 }

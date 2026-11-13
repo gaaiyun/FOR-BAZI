@@ -14,6 +14,8 @@ interface ChatState {
   isStreaming: boolean;
   /** Error from the last failed message. */
   error: string | null;
+  /** 这段对话属于哪一份命盘（BaziReading.id） */
+  chartId: string | null;
 }
 
 interface ChatActions {
@@ -27,6 +29,8 @@ interface ChatActions {
   setError: (error: string | null) => void;
   /** Clear all messages. */
   clearMessages: () => void;
+  /** 记下这段对话对应的命盘 */
+  setChartId: (id: string | null) => void;
 }
 
 let messageCounter = 0;
@@ -44,6 +48,7 @@ export const useChatStore = create<ChatState & ChatActions>()(
       messages: [],
       isStreaming: false,
       error: null,
+      chartId: null,
 
       // Actions
       addMessage: (message) =>
@@ -62,12 +67,14 @@ export const useChatStore = create<ChatState & ChatActions>()(
 
       setError: (error) => set({ error, isStreaming: false }),
 
-      clearMessages: () => set({ messages: [], error: null }),
+      clearMessages: () => set({ messages: [], error: null, chartId: null }),
+      setChartId: (chartId) => set({ chartId }),
     }),
     {
       name: "chat-storage",
       partialize: (state) => ({
         messages: state.messages,
+        chartId: state.chartId,
       }),
     }
   )

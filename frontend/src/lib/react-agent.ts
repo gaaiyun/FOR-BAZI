@@ -238,7 +238,7 @@ export async function* runReactLoop(
     for (const tc of turn.toolCalls) {
       const name = tc.function?.name ?? "";
       const rawArgs = tc.function?.arguments || "{}";
-      let args: Record<string, unknown> = {};
+      let args: Record<string, unknown>;
       try {
         args = JSON.parse(rawArgs);
       } catch {

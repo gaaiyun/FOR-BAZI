@@ -1,540 +1,178 @@
 /**
- * ChartVisualization page (/chart) -- displays the full Bazi chart
- * with four pillars, wuxing analysis, dayun timeline, and geju details.
- * Supports Professional/Basic toggle for advanced fields.
+ * 命盘页（/chart）。
+ *
+ * 一页读完一份命盘：四柱表在最上面占满版心，下面依次是格局、干支关系、
+ * 五行、大运。每一块都只陈述算出来的事实；判断留给解读页或用户自己的 AI。
  */
 
-import { useState, useMemo, useEffect } from "react";
-import { Section } from "@/components/layout/Page";
-import { useNavigate } from "react-router-dom";
-import { useBaziStore } from "@/stores/useBaziStore";
-import FourPillarGrid from "@/components/bazi/FourPillarGrid";
-import WuxingRadar from "@/components/bazi/WuxingRadar";
-import WuxingBar from "@/components/bazi/WuxingBar";
+import { Link } from "react-router-dom";
+import { PageHeader, Section, Facts, EmptyState } from "@/components/layout/Page";
+import { useChartView } from "@/hooks/useChartView";
+import PillarTable from "@/components/bazi/PillarTable";
+import RelationDiagram from "@/components/bazi/RelationDiagram";
+import ElementCycle from "@/components/bazi/ElementCycle";
+import Bars from "@/components/bazi/Bars";
 import DayunTimeline from "@/components/bazi/DayunTimeline";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
-import { getElementColor, getCharColor } from "@/lib/wuxing-colors";
-
-// ── Component ─────────────────────────────────────────────────────
+import { CopyChartButton } from "@/components/bazi/CopyChart";
+import { ELEMENTS } from "@/lib/ganzhi";
+import { ELEMENT_COLORS, getCharColor } from "@/lib/wuxing-colors";
 
 export default function ChartVisualization() {
-  const navigate = useNavigate();
-  const { reading, isLoading } = useBaziStore();
-  const [isProfessional, setIsProfessional] = useState(false);
+  const { reading, view } = useChartView();
 
-  // Redirect to calculator if no reading is available
-  useEffect(() => {
-    if (!reading && !isLoading) {
-      navigate("/");
-    }
-  }, [reading, isLoading, navigate]);
-
-  // Derive wuxing power from element_balance as fallback
-  const wuxingPower = useMemo(() => {
-    if (reading?.wuxing_power) return reading.wuxing_power;
-    if (reading?.element_balance) return reading.element_balance;
-    return { 金: 0, 木: 0, 水: 0, 火: 0, 土: 0 };
-  }, [reading]);
-
-  // Derive dayun entries from luck_pillars as fallback
-  const dayunEntries = useMemo(() => {
-    if (reading?.dayun) return reading.dayun;
-    if (reading?.luck_pillars) {
-      return reading.luck_pillars.map((lp, i) => ({
-        stem: lp.stem,
-        branch: lp.branch,
-        ganzhi: `${lp.stem}${lp.branch}`,
-        start_age: i * 10,
-        end_age: i * 10 + 9,
-        start_year: lp.start_year,
-        end_year: lp.end_year,
-        is_current: i === 0,
-      }));
-    }
-    return [];
-  }, [reading]);
-
-  // ── Loading state ────────────────────────────────────────────
-
-  if (isLoading || !reading) {
+  if (!reading || !view) {
     return (
-      <div className="animate-fade-in space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-64 rounded-xl" />
-          ))}
-        </div>
-        <div className="grid gap-6 md:grid-cols-2">
-          <Skeleton className="h-80 rounded-xl" />
-          <Skeleton className="h-80 rounded-xl" />
-        </div>
+      <div className="animate-fade-in">
+        <PageHeader title="命盘" />
+        <EmptyState />
       </div>
     );
   }
 
-  // ── Safe accessor for pillar annotations ─────────────────────
+  const b = reading.birth;
+  const g = view.geju;
+  const cur = view.currentDayun;
 
-  const mingGong = reading.ming_gong ?? "—";
-  const taiYuan = reading.tai_yuan ?? "—";
-  const shenGong = reading.shen_gong ?? "—";
-  const taiXi = reading.tai_xi ?? "—";
-
-  // ── Main render ──────────────────────────────────────────────
+  const subtitle = [
+    view.genderLabel,
+    b ? `公历 ${b.clock}` : null,
+    b?.lunar_text ? `农历 ${b.lunar_text}` : null,
+  ]
+    .filter(Boolean)
+    .join("　");
 
   return (
-    <div className="animate-fade-in space-y-6">
-      {/* Header with toggle */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold text-gold">
-            命盘 · Chart Visualization
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            日主:{" "}
-            <span style={{ color: getCharColor(reading.chart.day_master) }}>
-              {reading.chart.day_master}
-            </span>{" "}
-            ({reading.chart.day_master_element})
+    <div className="animate-fade-in">
+      <PageHeader
+        title={b?.name ? `${b.name}的命盘` : "命盘"}
+        description={
+          <>
+            <span className="tabular">{subtitle}</span>
+            {b && b.offset_minutes !== 0 && (
+              <span className="mt-1 block">
+                按真太阳时 <span className="tabular">{b.effective}</span> 排盘（{b.place || `东经 ${b.longitude}°`}，校正{" "}
+                {b.offset_minutes > 0 ? "+" : ""}
+                {b.offset_minutes} 分钟）
+              </span>
+            )}
+          </>
+        }
+        actions={<CopyChartButton />}
+      />
+
+      {/* ── 四柱 ─────────────────────────────────────────────── */}
+      <div className="border-t border-foreground pt-5">
+        <PillarTable pillars={view.pillars} />
+      </div>
+
+      <Facts
+        className="border-t border-rule py-6"
+        items={[
+          {
+            k: "日主",
+            v: (
+              <span>
+                <span className="font-heading font-semibold" style={{ color: getCharColor(view.dayMaster) }}>
+                  {view.dayMaster}
+                </span>{" "}
+                {view.dayMasterElement}
+              </span>
+            ),
+          },
+          ...(g ? [{ k: "格局", v: g.格局名称 }, { k: "日主强弱", v: `${g.日主强弱} · ${g.日主力量占比}%` }] : []),
+          ...view.palaces.map((p) => ({ k: p.label, v: p.value })),
+          ...(view.dayun[0]
+            ? [{ k: "起运", v: `虚岁 ${view.dayun[0].startAge} 岁 · ${view.direction}` }]
+            : []),
+        ]}
+      />
+
+      {/* ── 格局 ─────────────────────────────────────────────── */}
+      {g && (
+        <Section title="格局" description="取格看月令透干，强弱看五行力量，两者分开判断。">
+          <p className="font-heading text-2xl font-semibold">
+            {g.格局名称}
+            <span className="ml-3 font-sans text-sm font-normal text-muted-foreground">{g.格局类型}</span>
           </p>
+          <p className="mt-3 max-w-2xl text-[0.9375rem] leading-[1.9]">{g.context}</p>
+          <Facts
+            className="mt-6"
+            items={[
+              { k: "月令", v: `${g.月令}，主气 ${g.月令主气}` },
+              { k: "透干", v: g.透干位置 || "不透" },
+              { k: "最旺五行", v: g.最旺五行 },
+              { k: "印星", v: g.生扶力量.印星.join(" ") || "无" },
+              { k: "比劫", v: g.生扶力量.比劫.join(" ") || "无" },
+            ]}
+          />
+        </Section>
+      )}
+
+      {/* ── 干支关系 ─────────────────────────────────────────── */}
+      <Section title="干支关系" description="原局四柱之间的合、冲、刑、害。">
+        <RelationDiagram pillars={view.pillars} relations={view.relations} />
+      </Section>
+
+      {/* ── 五行 ─────────────────────────────────────────────── */}
+      <Section
+        title="五行"
+        description="含藏干、月令加权与十二长生，合计 100%。"
+        actions={
+          <Link to="/elements" className="link text-xs">
+            展开
+          </Link>
+        }
+      >
+        <div className="grid items-center gap-x-12 gap-y-8 sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+          <ElementCycle power={view.power} dayMasterElement={view.dayMasterElement} />
+          <Bars
+            max={Math.max(...ELEMENTS.map((e) => view.power[e]), 1)}
+            rows={ELEMENTS.map((e) => ({
+              key: e,
+              label: e,
+              value: view.power[e],
+              display: `${view.power[e].toFixed(1)}%`,
+              note: e === view.dayMasterElement ? "日主" : undefined,
+              color: ELEMENT_COLORS[e],
+            }))}
+          />
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsProfessional((v) => !v)}
-          className="border-border text-muted-foreground hover:border-gold hover:text-gold"
+      </Section>
+
+      {/* ── 大运 ─────────────────────────────────────────────── */}
+      {view.dayun.length > 0 && (
+        <Section
+          title="大运"
+          description={
+            cur
+              ? `现行 ${cur.ganzhi} 运，${cur.startYear}–${cur.endYear} 年。`
+              : `${view.dayun[0].startYear} 年起运。`
+          }
+          actions={
+            <Link to="/luck-pillars" className="link text-xs">
+              逐年看
+            </Link>
+          }
         >
-          {isProfessional ? "切换专业模式 ✓" : "切换专业模式"}
-        </Button>
-      </div>
+          <DayunTimeline dayun={view.dayun} />
+        </Section>
+      )}
 
-      {/* ── Four Pillar Grid ──────────────────────────────────── */}
-      <FourPillarGrid reading={reading} isProfessional={isProfessional} />
-
-      {/* ── Ming Gong / Tai Yuan / Shen Gong / Tai Xi ─────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { label: "命宫", value: mingGong },
-          { label: "胎元", value: taiYuan },
-          { label: "身宫", value: shenGong },
-          { label: "胎息", value: taiXi },
-        ].map(({ label, value }) => (
-          <Card
-            key={label}
-            className="border border-border bg-card/60 backdrop-blur-md"
-          >
-            <CardContent className="flex flex-col items-center gap-1 py-3">
-              <span className="text-xs text-muted-foreground">{label}</span>
-              <span className="text-lg font-bold text-gold">{value}</span>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* ── Wuxing Charts ─────────────────────────────────────── */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <Section title="五行力量雷达">
-            <WuxingRadar wuxingPower={wuxingPower} dayMasterElement={reading.chart.day_master_element} />
-          </Section>
-        <Section title="五行力量柱状">
-            <WuxingBar wuxingPower={wuxingPower} dayMasterElement={reading.chart.day_master_element} />
-          </Section>
-      </div>
-
-      {/* ── Tabbed Detail Sections ────────────────────────────── */}
-      <Tabs defaultValue="dayun">
-        <TabsList className="bg-muted">
-          <TabsTrigger value="dayun">大运流年</TabsTrigger>
-          <TabsTrigger value="geju">格局神煞</TabsTrigger>
-          <TabsTrigger value="wuxing">五行精算</TabsTrigger>
-        </TabsList>
-
-        {/* Tab 1: Dayun / Annual Pillars */}
-        <TabsContent value="dayun" className="mt-4 space-y-4">
-          <Section title="大运流年">
-              {dayunEntries.length > 0 ? (
-                <DayunTimeline dayun={dayunEntries} />
-              ) : (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  暂无大运数据
-                </p>
-              )}
-            </Section>
-
-          {/* Dayun list table */}
-          {dayunEntries.length > 0 && (
-            <Card className="border border-border bg-card/60 backdrop-blur-md">
-              <CardContent className="pt-4">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-muted-foreground">
-                        <th className="px-3 py-2 text-left">干支</th>
-                        <th className="px-3 py-2 text-left">起始年龄</th>
-                        <th className="px-3 py-2 text-left">起始年份</th>
-                        <th className="px-3 py-2 text-left">结束年份</th>
-                        <th className="px-3 py-2 text-left">状态</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dayunEntries.map((d, i) => (
-                        <tr
-                          key={i}
-                          className={`border-b border-border/50 ${
-                            d.is_current ? "bg-crimson/10" : ""
-                          }`}
-                        >
-                          <td className="px-3 py-2 font-medium">
-                            <span style={{ color: getCharColor(d.stem) }}>
-                              {d.stem}
-                            </span>
-                            <span style={{ color: getCharColor(d.branch) }}>
-                              {d.branch}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-muted-foreground">
-                            {d.start_age} - {d.end_age} 岁
-                          </td>
-                          <td className="px-3 py-2 text-muted-foreground">
-                            {d.start_year}
-                          </td>
-                          <td className="px-3 py-2 text-muted-foreground">
-                            {d.end_year}
-                          </td>
-                          <td className="px-3 py-2">
-                            {d.is_current ? (
-                              <Badge className="bg-crimson/20 text-crimson border-crimson/30 text-xs">
-                                当前
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Annual pillars preview */}
-          {reading.annual_pillars?.length > 0 && (
-            <Section title="近年流年">
-                <div className="flex flex-wrap gap-2">
-                  {reading.annual_pillars.slice(0, 12).map((ap, i) => (
-                    <div
-                      key={i}
-                      className="flex flex-col items-center rounded-lg border border-border bg-background px-3 py-2"
-                    >
-                      <span className="text-xs text-muted-foreground">{ap.year}</span>
-                      <span style={{ color: getCharColor(ap.stem) }}>
-                        {ap.stem}
-                      </span>
-                      <span style={{ color: getCharColor(ap.branch) }}>
-                        {ap.branch}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </Section>
-          )}
-        </TabsContent>
-
-        {/* Tab 2: Geju / ShenSha / XingChong */}
-        <TabsContent value="geju" className="mt-4 space-y-4">
-          {/* Geju analysis */}
-          {reading.geju ? (
-            <Card className="border border-border bg-card/60 backdrop-blur-md">
-              <CardHeader className="pb-0">
-                <CardTitle className="text-foreground">
-                  格局: {reading.geju.geju_type}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  {reading.geju.description}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <span className="text-xs text-muted-foreground">喜用神:</span>
-                  {reading.geju.favorable_elements.map((el, i) => (
-                    <Badge
-                      key={i}
-                      variant="secondary"
-                      className="text-xs"
-                      style={{
-                        backgroundColor: `${getElementColor(el)}15`,
-                        color: getElementColor(el),
-                        borderColor: `${getElementColor(el)}30`,
-                      }}
-                    >
-                      {el}
-                    </Badge>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="text-xs text-muted-foreground">忌神:</span>
-                  {reading.geju.unfavorable_elements.map((el, i) => (
-                    <Badge
-                      key={i}
-                      variant="secondary"
-                      className="text-xs"
-                      style={{
-                        backgroundColor: `${getElementColor(el)}15`,
-                        color: getElementColor(el),
-                        borderColor: `${getElementColor(el)}30`,
-                      }}
-                    >
-                      {el}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="border border-border bg-card/60 backdrop-blur-md">
-              <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                暂无格局分析数据
-              </CardContent>
-            </Card>
-          )}
-
-          {/* ShenSha list */}
-          {reading.all_shensha && reading.all_shensha.length > 0 && (
-            <Section title="神煞一览">
-                {/* 只渲染真正有神煞的柱：空柱此前也画成带绿点的整行，
-                    看起来像有内容，实际是空的。 */}
-                {(() => {
-                  const hits = reading.all_shensha.filter((s) => s.name?.trim());
-                  if (!hits.length) {
-                    return (
-                      <p className="py-6 text-center text-sm text-muted-foreground">
-                        此命盘四柱未见收录的神煞
-                      </p>
-                    );
-                  }
-                  return (
-                    <ul className="stagger space-y-2">
-                      {hits.map((ss, i) => (
-                        <li
-                          key={i}
-                          className="surface-inset flex items-baseline gap-3 rounded-lg px-3 py-2.5"
-                        >
-                          <span className="shrink-0 rounded-full border border-jade/25 bg-jade/10 px-2 py-0.5 text-[11px] font-medium text-jade">
-                            {ss.name}
-                          </span>
-                          <span className="shrink-0 text-[11px] text-muted-foreground">
-                            {ss.pillar}
-                          </span>
-                          <span className="flex-1 text-xs leading-relaxed text-foreground/75">
-                            {ss.description}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  );
-                })()}
-              </Section>
-          )}
-
-          {/* XingChong */}
-          {reading.xingchong && reading.xingchong.length > 0 && (
-            <Section title="刑冲合害">
-                <div className="flex flex-wrap gap-2">
-                  {reading.xingchong.map((xc, i) => (
-                    <Badge
-                      key={i}
-                      variant="destructive"
-                      className="bg-crimson/10 text-crimson border-crimson/30 text-xs"
-                    >
-                      {xc}
-                    </Badge>
-                  ))}
-                </div>
-              </Section>
-          )}
-        </TabsContent>
-
-        {/* Tab 3: Wuxing detail breakdown */}
-        <TabsContent value="wuxing" className="mt-4 space-y-4">
-          <Section title="五行精算">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-muted-foreground">
-                      <th className="px-3 py-2 text-left">五行</th>
-                      <th className="px-3 py-2 text-left">力量</th>
-                      <th className="px-3 py-2 text-left">占比</th>
-                      <th className="px-3 py-2 text-left">状态</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(["金", "木", "水", "火", "土"] as const).map((el) => {
-                      const val = wuxingPower[el] ?? 0;
-                      const total =
-                        Object.values(wuxingPower).reduce((a, b) => a + b, 0) ||
-                        1;
-                      const pct = ((val / total) * 100).toFixed(1);
-                      const color = getElementColor(el);
-                      const isFavorable =
-                        reading.favorable_elements?.includes(el);
-                      const isUnfavorable =
-                        reading.unfavorable_elements?.includes(el);
-
-                      return (
-                        <tr
-                          key={el}
-                          className="border-b border-border/50"
-                        >
-                          <td className="px-3 py-2">
-                            <span
-                              className="text-lg font-bold"
-                              style={{ color }}
-                            >
-                              {el}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-muted-foreground">{val}</td>
-                          <td className="px-3 py-2">
-                            <div className="flex items-center gap-2">
-                              <div className="h-2 w-24 overflow-hidden rounded-full bg-border">
-                                <div
-                                  className="h-full rounded-full transition-all"
-                                  style={{
-                                    width: `${pct}%`,
-                                    backgroundColor: color,
-                                  }}
-                                />
-                              </div>
-                              <span className="text-xs text-muted-foreground">
-                                {pct}%
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2">
-                            {isFavorable && (
-                              <Badge
-                                variant="secondary"
-                                className="bg-jade/15 text-jade border-jade/30 text-xs"
-                              >
-                                喜用
-                              </Badge>
-                            )}
-                            {isUnfavorable && (
-                              <Badge
-                                variant="destructive"
-                                className="bg-crimson/10 text-crimson border-crimson/30 text-xs"
-                              >
-                                忌神
-                              </Badge>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </Section>
-
-          {/* Ten gods overview */}
-          {reading.ten_gods?.length > 0 && (
-            <Section title="十神一览">
-                <div className="flex flex-wrap gap-2">
-                  {reading.ten_gods.map((tg, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2"
-                    >
-                      <span
-                        className="font-bold"
-                        style={{ color: getElementColor(tg.element) }}
-                      >
-                        {tg.character}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{tg.name}</span>
-                      {tg.is_favorable ? (
-                        <Badge
-                          variant="secondary"
-                          className="bg-jade/15 text-jade border-jade/30 text-[10px]"
-                        >
-                          吉
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="destructive"
-                          className="bg-crimson/10 text-crimson border-crimson/30 text-[10px]"
-                        >
-                          凶
-                        </Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </Section>
-          )}
-
-          {/* Favorable / Unfavorable summary */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <Section title="喜用神">
-                <div className="flex flex-wrap gap-2">
-                  {(reading.favorable_elements ?? []).map((el, i) => (
-                    <Badge
-                      key={i}
-                      variant="secondary"
-                      style={{
-                        backgroundColor: `${getElementColor(el)}15`,
-                        color: getElementColor(el),
-                        borderColor: `${getElementColor(el)}30`,
-                      }}
-                    >
-                      {el}
-                    </Badge>
-                  ))}
-                  {(!reading.favorable_elements ||
-                    reading.favorable_elements.length === 0) && (
-                    <span className="text-xs text-muted-foreground">暂无数据</span>
-                  )}
-                </div>
-              </Section>
-            <Section title="忌神">
-                <div className="flex flex-wrap gap-2">
-                  {(reading.unfavorable_elements ?? []).map((el, i) => (
-                    <Badge
-                      key={i}
-                      variant="destructive"
-                      style={{
-                        backgroundColor: `${getElementColor(el)}15`,
-                        color: getElementColor(el),
-                        borderColor: `${getElementColor(el)}30`,
-                      }}
-                    >
-                      {el}
-                    </Badge>
-                  ))}
-                  {(!reading.unfavorable_elements ||
-                    reading.unfavorable_elements.length === 0) && (
-                    <span className="text-xs text-muted-foreground">暂无数据</span>
-                  )}
-                </div>
-              </Section>
-          </div>
-
-          {/* Summary */}
-          {reading.summary && (
-            <Section title="命理总论">
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                  {reading.summary}
-                </p>
-              </Section>
-          )}
-        </TabsContent>
-      </Tabs>
+      {/* ── 去向 ─────────────────────────────────────────────── */}
+      <Section title="解读">
+        <p className="max-w-xl text-[0.9375rem] leading-[1.9]">
+          命盘只是算出来的事实。要读出含义，可以在站内让 AI 解读，也可以把整份命盘复制出去，交给你自己常用的 AI。
+        </p>
+        <div className="no-print mt-5 flex flex-wrap gap-2">
+          <Link to="/ai-reading" className="btn btn-line">
+            站内解读
+          </Link>
+          <Link to="/chat" className="btn btn-line">
+            问一件具体的事
+          </Link>
+          <CopyChartButton />
+        </div>
+      </Section>
     </div>
   );
 }
