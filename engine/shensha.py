@@ -14,6 +14,21 @@
     6. 禄神（Lu Star）         — 俸禄、财源、衣食
     7. 文昌（Literary Star）   — 聪明、学业、文才
     8. 将星（General Star）    — 领导力、权柄、威严
+    以下为第二批（2026-11 补入，查法见各表注释）：
+    9.  太极贵人   — 日干查四支
+    10. 天德贵人   — 月支查四柱干支
+    11. 月德贵人   — 月支三合查四柱天干
+    12. 金舆       — 日干查四支
+    13. 红鸾       — 年支查四支
+    14. 天喜       — 年支查四支（红鸾对冲位）
+    15. 孤辰       — 年支三会方查四支
+    16. 寡宿       — 年支三会方查四支
+    17. 劫煞       — 年支、日支三合查四支
+    18. 亡神       — 年支、日支三合查四支
+    19. 魁罡       — 日柱本身为庚辰、庚戌、壬辰、戊戌
+
+    第二批一律追加在第一批之后，同柱内的顺序按上面的编号，
+    这样第一批的输出顺序与旧版完全一致。
 
 返回格式：
     Dict[int, List[str]]，key 为柱索引（0=年, 1=月, 2=日, 3=时），
@@ -117,6 +132,138 @@ _WENCHANG: Dict[str, str] = {
     "己": "酉", "庚": "亥", "辛": "子", "壬": "寅", "癸": "卯",
 }
 
+
+
+# ── 第二批神煞（2026-11 补入）──────────────────────────────────────────
+
+# 太极贵人（日干）：甲乙→子午  丙丁→卯酉  戊己→辰戌丑未  庚辛→寅亥  壬癸→巳申
+_TAIJI: Dict[str, List[str]] = {
+    "甲": ["子", "午"], "乙": ["子", "午"],
+    "丙": ["卯", "酉"], "丁": ["卯", "酉"],
+    "戊": ["辰", "戌", "丑", "未"], "己": ["辰", "戌", "丑", "未"],
+    "庚": ["寅", "亥"], "辛": ["寅", "亥"],
+    "壬": ["巳", "申"], "癸": ["巳", "申"],
+}
+
+# 天德贵人（月支）：正丁二申宫，三壬四辛同，五亥六甲上，七癸八寅逢，九丙十归乙，子巳丑庚中。
+# 目标可能是天干也可能是地支，四柱干支都要查。
+_TIANDE: Dict[str, str] = {
+    "寅": "丁", "卯": "申", "辰": "壬", "巳": "辛", "午": "亥", "未": "甲",
+    "申": "癸", "酉": "寅", "戌": "丙", "亥": "乙", "子": "巳", "丑": "庚",
+}
+
+# 月德贵人（月支三合）：寅午戌→丙  申子辰→壬  亥卯未→甲  巳酉丑→庚，查四柱天干
+_YUEDE: Dict[str, str] = {
+    "寅": "丙", "午": "丙", "戌": "丙",
+    "申": "壬", "子": "壬", "辰": "壬",
+    "亥": "甲", "卯": "甲", "未": "甲",
+    "巳": "庚", "酉": "庚", "丑": "庚",
+}
+
+# 金舆（日干）：甲辰 乙巳 丙未 丁申 戊未 己申 庚戌 辛亥 壬丑 癸寅
+_JINYU: Dict[str, str] = {
+    "甲": "辰", "乙": "巳", "丙": "未", "丁": "申", "戊": "未",
+    "己": "申", "庚": "戌", "辛": "亥", "壬": "丑", "癸": "寅",
+}
+
+# 红鸾（年支）：子→卯 丑→寅 寅→丑 卯→子 辰→亥 巳→戌 午→酉 未→申 申→未 酉→午 戌→巳 亥→辰
+_HONGLUAN: Dict[str, str] = {
+    "子": "卯", "丑": "寅", "寅": "丑", "卯": "子", "辰": "亥", "巳": "戌",
+    "午": "酉", "未": "申", "申": "未", "酉": "午", "戌": "巳", "亥": "辰",
+}
+
+# 天喜（年支）：红鸾的对冲位
+_TIANXI: Dict[str, str] = {
+    "子": "酉", "丑": "申", "寅": "未", "卯": "午", "辰": "巳", "巳": "辰",
+    "午": "卯", "未": "寅", "申": "丑", "酉": "子", "戌": "亥", "亥": "戌",
+}
+
+# 孤辰、寡宿（年支所在三会方）：亥子丑→寅/戌  寅卯辰→巳/丑  巳午未→申/辰  申酉戌→亥/未
+_GUCHEN: Dict[str, str] = {
+    "亥": "寅", "子": "寅", "丑": "寅",
+    "寅": "巳", "卯": "巳", "辰": "巳",
+    "巳": "申", "午": "申", "未": "申",
+    "申": "亥", "酉": "亥", "戌": "亥",
+}
+_GUASU: Dict[str, str] = {
+    "亥": "戌", "子": "戌", "丑": "戌",
+    "寅": "丑", "卯": "丑", "辰": "丑",
+    "巳": "辰", "午": "辰", "未": "辰",
+    "申": "未", "酉": "未", "戌": "未",
+}
+
+# 劫煞（三合局绝位）：申子辰→巳  寅午戌→亥  巳酉丑→寅  亥卯未→申
+_JIESHA: Dict[str, str] = {
+    "申": "巳", "子": "巳", "辰": "巳",
+    "寅": "亥", "午": "亥", "戌": "亥",
+    "巳": "寅", "酉": "寅", "丑": "寅",
+    "亥": "申", "卯": "申", "未": "申",
+}
+
+# 亡神（三合局临官位）：申子辰→亥  寅午戌→巳  巳酉丑→申  亥卯未→寅
+_WANGSHEN: Dict[str, str] = {
+    "申": "亥", "子": "亥", "辰": "亥",
+    "寅": "巳", "午": "巳", "戌": "巳",
+    "巳": "申", "酉": "申", "丑": "申",
+    "亥": "寅", "卯": "寅", "未": "寅",
+}
+
+# 魁罡：日柱本身
+_KUIGANG = {"庚辰", "庚戌", "壬辰", "戊戌"}
+
+
+def _second_batch(pillars: List[str], result: Dict[int, List[str]]) -> None:
+    """第二批神煞，追加在第一批之后。顺序与模块文档的编号一致。"""
+    year_zhi = _zhi_at(pillars, 0)
+    month_zhi = _zhi_at(pillars, 1)
+    day_zhi = _zhi_at(pillars, 2)
+    day_gan = pillars[2][0] if len(pillars[2]) >= 1 else ""
+    gans = [p[0] if len(p) >= 1 else "" for p in pillars[:4]]
+    zhis = [_zhi_at(pillars, i) for i in range(4)]
+
+    def add(idx: int, name: str) -> None:
+        if name not in result[idx]:
+            result[idx].append(name)
+
+    # 年支、日支两个基准都查的（与桃花同一结构：年支先，日支不同时再补）
+    def by_year_and_day(table: Dict[str, str], name: str) -> None:
+        for i in range(4):
+            if not zhis[i]:
+                continue
+            if year_zhi and table.get(year_zhi) == zhis[i]:
+                add(i, name)
+            if day_zhi and day_zhi != year_zhi and table.get(day_zhi) == zhis[i]:
+                add(i, name)
+
+    for i in range(4):
+        # 9. 太极贵人
+        if day_gan and zhis[i] in _TAIJI.get(day_gan, []):
+            add(i, "太极贵人")
+    for i in range(4):
+        # 10. 天德贵人：目标为天干时查天干，为地支时查地支
+        target = _TIANDE.get(month_zhi, "")
+        if target and (gans[i] == target or zhis[i] == target):
+            add(i, "天德贵人")
+    for i in range(4):
+        # 11. 月德贵人
+        target = _YUEDE.get(month_zhi, "")
+        if target and gans[i] == target:
+            add(i, "月德贵人")
+    for i in range(4):
+        # 12. 金舆
+        if day_gan and zhis[i] and _JINYU.get(day_gan) == zhis[i]:
+            add(i, "金舆")
+    for name, table in (("红鸾", _HONGLUAN), ("天喜", _TIANXI), ("孤辰", _GUCHEN), ("寡宿", _GUASU)):
+        # 13–16. 以年支为基准
+        for i in range(4):
+            if year_zhi and zhis[i] and table.get(year_zhi) == zhis[i]:
+                add(i, name)
+    # 17–18. 劫煞、亡神
+    by_year_and_day(_JIESHA, "劫煞")
+    by_year_and_day(_WANGSHEN, "亡神")
+    # 19. 魁罡
+    if len(pillars) >= 3 and pillars[2] in _KUIGANG:
+        add(2, "魁罡")
 
 # ══════════════════════════════════════════════════════════════════════════
 # 公开 API
@@ -225,6 +372,7 @@ def calculate_shensha(pillars: List[str]) -> Dict[int, List[str]]:
                 if zhi == wenchang_target:
                     result[pillar_idx].append("文昌")
 
+    _second_batch(pillars, result)
     return result
 
 

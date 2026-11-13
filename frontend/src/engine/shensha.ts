@@ -76,6 +76,128 @@ const WENCHANG: Record<string, string> = {
   己: "酉", 庚: "亥", 辛: "子", 壬: "寅", 癸: "卯",
 };
 
+// ── 第二批神煞（2026-11 补入）。逐表对应 engine/shensha.py，顺序与 Python 版一致 ──
+
+/** 太极贵人（日干）：甲乙→子午  丙丁→卯酉  戊己→辰戌丑未  庚辛→寅亥  壬癸→巳申 */
+const TAIJI: Record<string, string[]> = {
+  甲: ["子", "午"], 乙: ["子", "午"],
+  丙: ["卯", "酉"], 丁: ["卯", "酉"],
+  戊: ["辰", "戌", "丑", "未"], 己: ["辰", "戌", "丑", "未"],
+  庚: ["寅", "亥"], 辛: ["寅", "亥"],
+  壬: ["巳", "申"], 癸: ["巳", "申"],
+};
+
+/** 天德贵人（月支）。目标可能是天干也可能是地支，四柱干支都查。 */
+const TIANDE: Record<string, string> = {
+  寅: "丁", 卯: "申", 辰: "壬", 巳: "辛", 午: "亥", 未: "甲",
+  申: "癸", 酉: "寅", 戌: "丙", 亥: "乙", 子: "巳", 丑: "庚",
+};
+
+/** 月德贵人（月支三合）：寅午戌→丙  申子辰→壬  亥卯未→甲  巳酉丑→庚，查四柱天干 */
+const YUEDE: Record<string, string> = {
+  寅: "丙", 午: "丙", 戌: "丙",
+  申: "壬", 子: "壬", 辰: "壬",
+  亥: "甲", 卯: "甲", 未: "甲",
+  巳: "庚", 酉: "庚", 丑: "庚",
+};
+
+/** 金舆（日干） */
+const JINYU: Record<string, string> = {
+  甲: "辰", 乙: "巳", 丙: "未", 丁: "申", 戊: "未",
+  己: "申", 庚: "戌", 辛: "亥", 壬: "丑", 癸: "寅",
+};
+
+/** 红鸾（年支） */
+const HONGLUAN: Record<string, string> = {
+  子: "卯", 丑: "寅", 寅: "丑", 卯: "子", 辰: "亥", 巳: "戌",
+  午: "酉", 未: "申", 申: "未", 酉: "午", 戌: "巳", 亥: "辰",
+};
+
+/** 天喜（年支）：红鸾的对冲位 */
+const TIANXI: Record<string, string> = {
+  子: "酉", 丑: "申", 寅: "未", 卯: "午", 辰: "巳", 巳: "辰",
+  午: "卯", 未: "寅", 申: "丑", 酉: "子", 戌: "亥", 亥: "戌",
+};
+
+/** 孤辰、寡宿（年支所在三会方） */
+const GUCHEN: Record<string, string> = {
+  亥: "寅", 子: "寅", 丑: "寅",
+  寅: "巳", 卯: "巳", 辰: "巳",
+  巳: "申", 午: "申", 未: "申",
+  申: "亥", 酉: "亥", 戌: "亥",
+};
+const GUASU: Record<string, string> = {
+  亥: "戌", 子: "戌", 丑: "戌",
+  寅: "丑", 卯: "丑", 辰: "丑",
+  巳: "辰", 午: "辰", 未: "辰",
+  申: "未", 酉: "未", 戌: "未",
+};
+
+/** 劫煞（三合局绝位） */
+const JIESHA: Record<string, string> = {
+  申: "巳", 子: "巳", 辰: "巳",
+  寅: "亥", 午: "亥", 戌: "亥",
+  巳: "寅", 酉: "寅", 丑: "寅",
+  亥: "申", 卯: "申", 未: "申",
+};
+
+/** 亡神（三合局临官位） */
+const WANGSHEN: Record<string, string> = {
+  申: "亥", 子: "亥", 辰: "亥",
+  寅: "巳", 午: "巳", 戌: "巳",
+  巳: "申", 酉: "申", 丑: "申",
+  亥: "寅", 卯: "寅", 未: "寅",
+};
+
+/** 魁罡：日柱本身 */
+const KUIGANG = new Set(["庚辰", "庚戌", "壬辰", "戊戌"]);
+
+function secondBatch(pillars: string[], result: ShenShaDetail): void {
+  const yearZhi = zhiAt(pillars, 0);
+  const monthZhi = zhiAt(pillars, 1);
+  const dayZhi = zhiAt(pillars, 2);
+  const dayGan = (pillars[2] ?? "").length >= 1 ? pillars[2][0] : "";
+  const gans = [0, 1, 2, 3].map((i) => ((pillars[i] ?? "").length >= 1 ? pillars[i][0] : ""));
+  const zhis = [0, 1, 2, 3].map((i) => zhiAt(pillars, i));
+
+  const add = (i: number, name: string) => {
+    if (!result[i].includes(name)) result[i].push(name);
+  };
+  // 年支、日支两个基准都查（与桃花同一结构：年支先，日支不同时再补）
+  const byYearAndDay = (table: Record<string, string>, name: string) => {
+    for (let i = 0; i < 4; i++) {
+      if (!zhis[i]) continue;
+      if (yearZhi && table[yearZhi] === zhis[i]) add(i, name);
+      if (dayZhi && dayZhi !== yearZhi && table[dayZhi] === zhis[i]) add(i, name);
+    }
+  };
+
+  for (let i = 0; i < 4; i++) {
+    if (dayGan && zhis[i] && (TAIJI[dayGan] ?? []).includes(zhis[i])) add(i, "太极贵人");
+  }
+  for (let i = 0; i < 4; i++) {
+    const t = TIANDE[monthZhi] ?? "";
+    if (t && (gans[i] === t || zhis[i] === t)) add(i, "天德贵人");
+  }
+  for (let i = 0; i < 4; i++) {
+    const t = YUEDE[monthZhi] ?? "";
+    if (t && gans[i] === t) add(i, "月德贵人");
+  }
+  for (let i = 0; i < 4; i++) {
+    if (dayGan && zhis[i] && JINYU[dayGan] === zhis[i]) add(i, "金舆");
+  }
+  for (const [name, table] of [
+    ["红鸾", HONGLUAN], ["天喜", TIANXI], ["孤辰", GUCHEN], ["寡宿", GUASU],
+  ] as const) {
+    for (let i = 0; i < 4; i++) {
+      if (yearZhi && zhis[i] && table[yearZhi] === zhis[i]) add(i, name);
+    }
+  }
+  byYearAndDay(JIESHA, "劫煞");
+  byYearAndDay(WANGSHEN, "亡神");
+  if (KUIGANG.has(pillars[2] ?? "")) add(2, "魁罡");
+}
+
 /**
  * 根据四柱干支计算神煞。
  * @param pillars [年柱, 月柱, 日柱, 时柱]，每柱两字如 "庚寅"
@@ -151,6 +273,7 @@ export function calculateShenSha(pillars: string[]): ShenShaDetail {
     }
   }
 
+  secondBatch(pillars, result);
   return result;
 }
 

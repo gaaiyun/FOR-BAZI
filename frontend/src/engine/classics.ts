@@ -97,7 +97,9 @@ function str(v: unknown): string {
 // ── 穷通宝鉴 ──────────────────────────────────────────────────────────
 
 function qiongtongIndex(book: RawBook) {
-  // 原始键形如 "甲日_寅月"，索引为 [日主][季节]
+  // 原始键形如 "甲日_寅月"。原书逐月立论，所以按月支精确建索引；
+  // 此前只按季节存，同季三个月互相覆盖，三分之二的命盘拿到的是别的月份的条文。
+  // 季节键保留作兜底。
   const idx: Record<string, Record<string, { 用神: string; 原文: string; 白话: string }>> = {};
   for (const [key, entry] of Object.entries(book.entries ?? {})) {
     const parts = key.split("_");
@@ -107,11 +109,13 @@ function qiongtongIndex(book: RawBook) {
     const season = MONTH_ZHI_TO_SEASON[monthZhi] ?? "春月";
     const 原文 = str(entry["原文"]);
     idx[dayMaster] ??= {};
-    idx[dayMaster][season] = {
+    const record = {
       用神: 原文.includes("。") ? 原文.split("。")[0] : 原文,
       原文,
       白话: str(entry["解析"]),
     };
+    idx[dayMaster][monthZhi] = record;
+    idx[dayMaster][season] = record;
   }
   return idx;
 }
@@ -120,12 +124,13 @@ export async function getQiongtongForTool(dayMaster: string, monthZhi: string) {
   if (!dayMaster || !monthZhi) return { context: "缺少日主或月支。" };
   const books = await loadBooks();
   const season = MONTH_ZHI_TO_SEASON[monthZhi] ?? "春月";
-  const g = qiongtongIndex(books.穷通宝鉴)[dayMaster]?.[season];
+  const byStem = qiongtongIndex(books.穷通宝鉴)[dayMaster];
+  const g = byStem?.[monthZhi] ?? byStem?.[season];
   if (!g) return { context: `未收录「${dayMaster}日主 ${season}」的条文。` };
   return {
     day_master: dayMaster, month_zhi: monthZhi, season,
     用神: g.用神, 原文: g.原文, 白话: g.白话,
-    context: `《穷通宝鉴》${dayMaster}日主${season}：用神${g.用神}。${g.白话}`,
+    context: `《穷通宝鉴》${dayMaster}日主${monthZhi}月：用神${g.用神}。${g.白话}`,
   };
 }
 
@@ -133,7 +138,8 @@ export async function getQiongtongGuidance(dayMaster: string, monthZhi: string):
   if (!dayMaster || !monthZhi) return "";
   const books = await loadBooks();
   const season = MONTH_ZHI_TO_SEASON[monthZhi] ?? "春月";
-  const g = qiongtongIndex(books.穷通宝鉴)[dayMaster]?.[season];
+  const byStem = qiongtongIndex(books.穷通宝鉴)[dayMaster];
+  const g = byStem?.[monthZhi] ?? byStem?.[season];
   if (!g) return "";
   return (
     `**《穷通宝鉴》调候用神（${dayMaster}日主 ${season}）**\n` +
@@ -334,7 +340,7 @@ export async function queryClassicalText(
 
 /** 把中文查询切成 1-3 字的片段：古籍专名多为 2-3 字，无需分词器。 */
 function gramsOf(query: string): string[] {
-  const cleaned = query.replace(/[\s，。、；：！？"'（）()《》\[\]{}]/g, "");
+  const cleaned = query.replace(/[\s，。、；：！？"'（）()《》[\]{}]/g, "");
   const out = new Set<string>();
   for (let n = 3; n >= 2; n--) {
     for (let i = 0; i + n <= cleaned.length; i++) out.add(cleaned.slice(i, i + n));

@@ -59,11 +59,16 @@ def _build_qiongtong_index():
 
         # 从原文中提取用神信息
         原文 = entry.get("原文", "")
-        QIONGTONG_BAOJIAN[day_master][season] = {
+        record = {
             "用神": 原文.split("。")[0] if "。" in 原文 else 原文,
             "原文": 原文,
             "白话": entry.get("解析", ""),
         }
+        # 原书逐月立论（甲木寅月与辰月用神不同）。此前只按季节建索引，
+        # 同季三个月互相覆盖，三分之二的命盘拿到的是别的月份的条文。
+        # 现在按月支精确存一份；季节键保留作兜底，取该季最后写入的一条。
+        QIONGTONG_BAOJIAN[day_master][month_zhi] = record
+        QIONGTONG_BAOJIAN[day_master][season] = record
 
 _build_qiongtong_index()
 
@@ -172,7 +177,8 @@ def get_qiongtong_for_tool(day_master: str, month_zhi: str) -> Dict[str, Any]:
     if not day_master or not month_zhi:
         return {"context": "缺少日主或月支。"}
     season = MONTH_ZHI_TO_SEASON.get(month_zhi, "春月")
-    guidance = (QIONGTONG_BAOJIAN.get(day_master, {}) or {}).get(season, {})
+    stem_guidance = QIONGTONG_BAOJIAN.get(day_master, {}) or {}
+    guidance = stem_guidance.get(month_zhi) or stem_guidance.get(season, {})
     if not guidance:
         return {"context": f"未收录「{day_master}日主 {season}」的条文。"}
     return {
@@ -182,7 +188,7 @@ def get_qiongtong_for_tool(day_master: str, month_zhi: str) -> Dict[str, Any]:
         "用神": guidance.get("用神", ""),
         "原文": guidance.get("原文", ""),
         "白话": guidance.get("白话", ""),
-        "context": f"《穷通宝鉴》{day_master}日主{season}：用神{guidance.get('用神', '')}。{guidance.get('白话', '')}",
+        "context": f"《穷通宝鉴》{day_master}日主{month_zhi}月：用神{guidance.get('用神', '')}。{guidance.get('白话', '')}",
     }
 
 
