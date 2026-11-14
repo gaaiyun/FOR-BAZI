@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   ai_provider: {
     provider: "cloudflare",
     api_key: "",
-    model: "@cf/zai-org/glm-4.7-flash",
+    model: "deepseek-flash",
     base_url: "",
     streaming: true,
   },
@@ -61,6 +61,16 @@ export const useSettingsStore = create<SettingsState & SettingsActions>()(
     }),
     {
       name: "settings-storage",
+      // v1：站内默认模型从 Workers AI 的 glm-4.7-flash 换成 DeepSeek。
+      // 旧版存下的还是 glm，不迁移的话老用户会一直绕开 DeepSeek。
+      version: 1,
+      migrate: (persisted, from) => {
+        const st = (persisted ?? {}) as Partial<SettingsState>;
+        if (from < 1 && st.ai_provider?.provider === "cloudflare" && st.ai_provider.model === "@cf/zai-org/glm-4.7-flash") {
+          st.ai_provider = { ...st.ai_provider, model: "deepseek-flash" };
+        }
+        return st as SettingsState & SettingsActions;
+      },
       partialize: (state) => ({
         ai_provider: state.ai_provider,
         theme: state.theme,

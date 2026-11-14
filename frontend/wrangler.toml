@@ -12,6 +12,10 @@ id = "3b5ce3734a4041ee8f88d1725a93cb1e"
 
 [vars]
 ANON_DAILY_LIMIT = "5"
+# 默认模型：配置了 DEEPSEEK_API_KEY 时走 DeepSeek，出错时退回 Workers AI 的 DEFAULT_MODEL
+DEEPSEEK_MODEL = "deepseek-flash"
 DEFAULT_MODEL = "@cf/zai-org/glm-4.7-flash"
 
-# 机密单独设置：wrangler pages secret put ACCESS_KEYS --project-name=for-bazi
+# 机密单独设置：
+#   wrangler pages secret put ACCESS_KEYS --project-name=for-bazi
+#   wrangler pages secret put DEEPSEEK_API_KEY --project-name=for-bazi

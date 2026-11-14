@@ -7,8 +7,12 @@
  * 三种访问模式：
  *   1. 自带 provider key（X-Provider-Key + X-Provider-Base-Url）
  *      -> 转发到对方自己的服务商，用对方额度，不限次；顺带解决浏览器直连的 CORS。
- *   2. 持访问密钥（X-Access-Key 命中 ACCESS_KEYS）-> 用站长的 Workers AI，不限次。
- *   3. 匿名 -> 用站长的 Workers AI，按 IP 每日限次（RATE_LIMIT_KV）。
+ *   2. 持访问密钥（X-Access-Key 命中 ACCESS_KEYS）-> 用站长的模型，不限次。
+ *   3. 匿名 -> 用站长的模型，按 IP 每日限次（RATE_LIMIT_KV）。
+ *
+ * 站长的模型：配置了 DEEPSEEK_API_KEY 时默认走 DeepSeek（DEEPSEEK_MODEL，默认 deepseek-flash）；
+ * DeepSeek 在开始输出前出错（欠费、限流、宕机）就自动退回 Workers AI，站点不会因此不可用。
+ * 请求里的模型名以 @cf/ 开头时直接用 Workers AI。
  *
  * 同源部署，因此不需要 CORS 头。
  */
@@ -18,8 +22,15 @@ interface Env {
   RATE_LIMIT_KV: KVNamespace;
   ACCESS_KEYS?: string;
   ANON_DAILY_LIMIT?: string;
+  /** Workers AI 模型（DeepSeek 不可用时的兜底） */
   DEFAULT_MODEL?: string;
+  /** 站长的 DeepSeek Key（wrangler pages secret put DEEPSEEK_API_KEY） */
+  DEEPSEEK_API_KEY?: string;
+  DEEPSEEK_MODEL?: string;
 }
+
+const DEEPSEEK_BASE = "https://api.deepseek.com/v1";
+const DEFAULT_DEEPSEEK_MODEL = "deepseek-flash";
 
 const DEFAULT_MODEL = "@cf/zai-org/glm-4.7-flash";
 const DEFAULT_ANON_LIMIT = 5;
@@ -107,7 +118,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     });
   }
 
-  // ── 模式 2 / 3：用站长的 Workers AI ──
+  // ── 模式 2 / 3：用站长的模型 ──
   let quotaHeaders: Record<string, string> = {};
   let quotaKey = "";
   let quotaUsed = 0;
@@ -134,30 +145,65 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     };
   }
 
-  const model = String(body.model ?? env.DEFAULT_MODEL ?? DEFAULT_MODEL);
+  const mode = hasKey ? "key" : "anonymous";
+  const countUsage = async () => {
+    // 计数放在成功之后：上游失败不该扣掉用户的免费次数。
+    if (!hasKey && quotaKey) {
+      await env.RATE_LIMIT_KV.put(quotaKey, String(quotaUsed + 1), { expirationTtl: 60 * 60 * 48 });
+    }
+  };
+
+  const requested = typeof body.model === "string" ? body.model : "";
+  const wantsWorkersAI = requested.startsWith("@cf/");
+  let fallbackReason = "";
+
+  // ── 默认：DeepSeek ──
+  if (env.DEEPSEEK_API_KEY && !wantsWorkersAI) {
+    const dsModel = env.DEEPSEEK_MODEL ?? DEFAULT_DEEPSEEK_MODEL;
+    try {
+      const upstream = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`, "Content-Type": "application/json" },
+        // 模型由站长决定，不接受浏览器指定，避免匿名用户换成更贵的模型
+        body: JSON.stringify({ ...body, model: dsModel }),
+      });
+      if (upstream.ok && upstream.body) {
+        await countUsage();
+        return new Response(upstream.body, {
+          status: 200,
+          headers: {
+            ...quotaHeaders,
+            "Content-Type": upstream.headers.get("Content-Type") ?? "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache",
+            "X-Bazi-Mode": mode,
+            "X-Bazi-Model": dsModel,
+          },
+        });
+      }
+      fallbackReason = `deepseek ${upstream.status}`;
+    } catch (err) {
+      fallbackReason = `deepseek ${err instanceof Error ? err.message : String(err)}`.slice(0, 120);
+    }
+  }
+
+  // ── 兜底 / 显式指定：Workers AI ──
+  const model = wantsWorkersAI ? requested : String(env.DEFAULT_MODEL ?? DEFAULT_MODEL);
   // 模型名单独传给 env.AI.run，其余字段原样透传
   const rest: Record<string, unknown> = { ...body };
   delete rest.model;
 
   try {
     const result = await env.AI.run(model, rest);
-    // 计数放在成功之后：上游失败不该扣掉用户的免费次数。
-    if (!hasKey && quotaKey) {
-      await env.RATE_LIMIT_KV.put(quotaKey, String(quotaUsed + 1), { expirationTtl: 60 * 60 * 48 });
-    }
-    const mode = hasKey ? "key" : "anonymous";
+    await countUsage();
+    const headers: Record<string, string> = { ...quotaHeaders, "X-Bazi-Mode": mode, "X-Bazi-Model": model };
+    if (fallbackReason) headers["X-Bazi-Fallback"] = fallbackReason;
     if (result instanceof ReadableStream) {
       return new Response(result, {
         status: 200,
-        headers: {
-          ...quotaHeaders,
-          "Content-Type": "text/event-stream; charset=utf-8",
-          "Cache-Control": "no-cache",
-          "X-Bazi-Mode": mode,
-        },
+        headers: { ...headers, "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache" },
       });
     }
-    return json(result, 200, { ...quotaHeaders, "X-Bazi-Mode": mode });
+    return json(result, 200, headers);
   } catch (err) {
     return json(
       { error: "模型调用失败", detail: err instanceof Error ? err.message : String(err) },

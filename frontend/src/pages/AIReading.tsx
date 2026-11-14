@@ -235,7 +235,7 @@ export default function AIReading() {
       {/* ── 还没有结果 ─────────────────────────────────────────── */}
       {!content && !live && !error && (
         <div className="mt-12 max-w-xl border-t border-rule pt-8 text-sm leading-relaxed text-muted-foreground">
-          <p>一次解读大约需要半分钟到一分钟。默认使用站内的免费模型，每天有次数限制。</p>
+          <p>一次完整解读通常要一到两分钟。默认使用站长提供的 DeepSeek，每天有次数限制。</p>
           <p className="mt-2">想用更强的模型，可以在设置里填自己的服务，或者把命盘整份复制给自己常用的 AI：</p>
           <CopyChartButton compact className="mt-4" />
         </div>

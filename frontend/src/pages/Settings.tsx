@@ -1,6 +1,6 @@
 /**
  * 设置页（/settings）。
- * AI 服务（默认免费模型 / 自带服务商）、外观、本地数据。
+ * AI 服务（站内服务 / 自带服务商）、外观、本地数据。
  */
 
 import { useState } from "react";
@@ -15,11 +15,12 @@ import type { AIProviderId, AppSettings } from "@/types/bazi";
 
 /** Provider presets: label, default model, default base URL. */
 const PROVIDER_PRESETS: Record<AIProviderId, { label: string; models: string[]; baseUrl: string }> = {
-  // Workers AI models must support tool calling — the ReAct loop always
-  // sends tool schemas. Models without it silently ignore the tools.
+  // 站内服务由网关决定实际服务商：deepseek-flash 走站长的 DeepSeek，@cf/ 开头走 Workers AI。
+  // 模型必须支持工具调用——ReAct 循环每轮都带工具 schema，不支持的模型会静默忽略。
   cloudflare: {
-    label: "站内免费",
+    label: "站内服务",
     models: [
+      "deepseek-flash",
       "@cf/zai-org/glm-4.7-flash",
       "@cf/qwen/qwen3-30b-a3b-fp8",
       "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
@@ -91,7 +92,7 @@ export default function Settings() {
 
   const handleSave = () => {
     if (!isFree && !apiKey.trim()) {
-      toast.error("还没有填 API Key", { description: "自带服务需要你自己的密钥；不填请选「站内免费」。" });
+      toast.error("还没有填 API Key", { description: "自带服务需要你自己的密钥；不填请选「站内服务」。" });
       return;
     }
     setAIProvider({ provider, api_key: apiKey.trim(), model: model.trim(), base_url: baseUrl.trim(), streaming });
@@ -116,7 +117,7 @@ export default function Settings() {
     <div className="animate-fade-in">
       <PageHeader title="设置" description="排盘不需要任何设置；这里只管 AI 解读用哪家服务，以及外观。" />
 
-      <Section title="免费额度" description="默认使用站长预配的 Cloudflare 免费模型，开箱即用。" className="border-t">
+      <Section title="免费额度" description="默认使用站长提供的 DeepSeek，开箱即用；它不可用时自动换成 Cloudflare 的免费模型。" className="border-t">
         <AccessKeyCard />
       </Section>
 
