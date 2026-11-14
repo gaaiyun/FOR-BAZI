@@ -11,6 +11,7 @@ import { analyzeGeJu } from "./geju";
 import {
   getQiongtongGuidance, getDisitianGuidance, getZipingGuidance, getSanmingGuidance,
 } from "./classics";
+import { HIDDEN_STEMS, tenGod, yearGanzhi } from "@/lib/ganzhi";
 
 const PERSONA =
   "你是一位正统且极具专业素养的新中式命理大师，名为「玄冥」。你精通子平八字、穷通宝鉴与滴天髓，" +
@@ -53,21 +54,72 @@ const REACT_GUIDANCE = `
 **格式**：回答请使用 Markdown 排版，结合日主生克制化与五行十神进行深度批改。
 `;
 
+/**
+ * 当前时间。模型不知道今天是哪一天，不写明的话会按训练数据猜年份——
+ * 线上实测曾把「今明两年」写成去年和今年。
+ */
+function sectionNow(c: BaziChart, now: Date): string {
+  const y = now.getFullYear();
+  const first = c.dayun?.[0];
+  const birthYear = first ? first.start_year - first.start_age + 1 : null;
+  const dayun = c.dayun ?? [];
+  let current = "";
+  for (let i = 0; i < dayun.length; i++) {
+    const end = dayun[i + 1] ? dayun[i + 1].start_year - 1 : dayun[i].start_year + 9;
+    if (y >= dayun[i].start_year && y <= end) current = `${dayun[i].ganzhi}（${dayun[i].start_year}–${end}）`;
+  }
+  return [
+    `- **今天**：${y} 年 ${now.getMonth() + 1} 月 ${now.getDate()} 日`,
+    `- **今年**：${y} ${yearGanzhi(y)}；**明年**：${y + 1} ${yearGanzhi(y + 1)}`,
+    birthYear ? `- **命主今年虚岁**：${y - birthYear + 1}` : "",
+    `- **现行大运**：${current || "尚未起运或已超出所列大运"}`,
+    "说到「今年」「明年」「近两年」「当前」时，一律以上面为准。",
+  ].filter(Boolean).join("\n");
+}
+
 function sectionParams(c: BaziChart): string {
   const dy = (c.dayun ?? [])
     .map((d) => `${d.start_year}年(${d.start_age}岁)起: ${d.ganzhi}`)
     .join(" | ");
   const p = c.pillars ?? ["", "", "", ""];
-  const z = c.tg_zhi ?? ["", "", "", ""];
   const n = c.nayin ?? ["", "", "", ""];
+  const dm = c.day_master ?? "";
   const labels = ["年柱 (祖业/早年)", "月柱 (父母/青年)", "日柱 (夫妻/中年)", "时柱 (子女/晚年)"];
+  const short = ["年", "月", "日", "时"];
+  const stems = p.map((x) => x?.[0] ?? "");
+
+  // 逐柱写明天干、地支与藏干各是什么字、什么十神。
+  // 旧版「藏」后面只有十神名没有字，模型分不清哪个字藏、哪个字透。
+  const lines = labels.map((l, i) => {
+    const gan = stems[i];
+    const zhi = p[i]?.[1] ?? "";
+    const ganGod = i === 2 ? "日主" : tenGod(dm, gan);
+    const hidden = (HIDDEN_STEMS[zhi] ?? []).map((h) => `${h}${tenGod(dm, h)}`).join("、");
+    return `- ${l}：天干 ${gan}（${ganGod}）｜地支 ${zhi}，藏 ${hidden}｜纳音 ${n[i]}`;
+  });
+
+  // 透干：地支藏干里，哪些字同时出现在四个天干上。只有这些才能说「透」。
+  const tou: string[] = [];
+  const cang: string[] = [];
+  p.forEach((x, i) => {
+    for (const h of HIDDEN_STEMS[x?.[1] ?? ""] ?? []) {
+      const at = stems.map((g, k) => (g === h ? `${short[k]}干` : "")).filter(Boolean);
+      if (at.length) tou.push(`${short[i]}支${x[1]}中${h}（透于${at.join("、")}）`);
+      else cang.push(`${short[i]}支${x[1]}中${h}`);
+    }
+  });
+
   return [
     `- **性别**：${c.gender ?? ""}`,
     `- **命宫**：${c.minggong ?? ""} | **胎元**：${c.taiyuan ?? ""}`,
-    `- **日主 (Day Master)**：${c.day_master ?? ""}`,
+    `- **日主 (Day Master)**：${dm}`,
     "",
     "**【四柱原局分布】**：",
-    ...labels.map((l, i) => `- ${l}：${p[i]} | 藏：${z[i]} | 纳音：${n[i]}`),
+    ...lines,
+    "",
+    "**【透干与藏而不透】**（只有列在「透干」里的字才能说透出天干）：",
+    `- 透干：${tou.join("；") || "无"}`,
+    `- 藏而不透：${cang.join("；") || "无"}`,
     "",
     "**【后天大运轨迹】**：",
     dy || "（暂无）",
@@ -92,7 +144,7 @@ export async function ancientSection(c: BaziChart): Promise<string> {
   return parts.filter(Boolean).join("\n\n");
 }
 
-export async function buildSystemPrompt(chart: BaziChart | null): Promise<string> {
+export async function buildSystemPrompt(chart: BaziChart | null, now: Date = new Date()): Promise<string> {
   if (!chart) {
     return `${PERSONA}\n\n（尚未排盘，请先让用户在「排盘」页填写出生信息。）`;
   }
@@ -101,6 +153,9 @@ export async function buildSystemPrompt(chart: BaziChart | null): Promise<string
     ? `\n**【古籍参考 - 穷通宝鉴 / 滴天髓 / 子平真诠】**\n${ancient}\n`
     : "";
   return `${PERSONA}
+
+**【当前时间】**
+${sectionNow(chart, now)}
 
 **【命理先天参数 - 绝对真理，禁止篡改】**
 ${sectionParams(chart)}

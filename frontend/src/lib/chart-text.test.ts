@@ -7,6 +7,7 @@ import { resolveBirth, isChinaDst, equationOfTime, formatDateTime } from "./sola
 import { yearGanzhi, tenGod } from "./ganzhi";
 import { calculateShenSha } from "@/engine/shensha";
 import { explainShensha } from "@/engine/tools";
+import { buildSystemPrompt } from "@/engine/prompt";
 import type { BaziInput } from "@/types/bazi";
 
 const BASE: BaziInput = {
@@ -175,5 +176,29 @@ describe("神煞释义覆盖", () => {
       const r = explainShensha(n) as { description?: string };
       expect(r.description, n).toBeTruthy();
     }
+  });
+});
+
+describe("系统提示词", () => {
+  it("写明今天的日期、今明两年干支、虚岁和现行大运", async () => {
+    const reading = await calculateBazi({ ...BASE, birth_date: "2002-07-21", birth_time: "03:45" });
+    const p = await buildSystemPrompt(reading.engine_chart!, NOW);
+    expect(p).toContain("**今天**：2026 年 11 月 12 日");
+    expect(p).toContain("**今年**：2026 丙午；**明年**：2027 丁未");
+    expect(p).toContain("**命主今年虚岁**：25");
+    expect(p).toContain("**现行大运**：己酉（2018–2027）");
+  });
+
+  it("逐柱写出藏干的字，并区分透干与藏而不透", async () => {
+    // 壬午 丁未 庚寅 戊寅：未中丁透月干、己不透；寅中戊透时干
+    const reading = await calculateBazi({ ...BASE, birth_date: "2002-07-21", birth_time: "03:45" });
+    const p = await buildSystemPrompt(reading.engine_chart!, NOW);
+    expect(p).toContain("天干 丁（正官）｜地支 未，藏 己正印、丁正官、乙正财");
+    const tou = p.split("\n").find((l) => l.startsWith("- 透干："))!;
+    const cang = p.split("\n").find((l) => l.startsWith("- 藏而不透："))!;
+    expect(tou).toContain("月支未中丁（透于月干）");
+    expect(tou).toContain("日支寅中戊（透于时干）");
+    expect(tou).not.toContain("未中己");
+    expect(cang).toContain("月支未中己");
   });
 });
