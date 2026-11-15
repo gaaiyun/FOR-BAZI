@@ -103,7 +103,7 @@ export default function AccessKeyCard() {
             <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
               {remaining === 0
                 ? "今日免费次数已用完。可以填访问密钥，改用自己的 AI 服务，或把命盘复制给自己的 AI。"
-                : "匿名使用按 IP 每日重置。填入访问密钥可解除限制。"}
+                : "一次提问算一次，按 IP 每日重置。填入访问密钥可解除限制。"}
             </p>
           </div>
         )}

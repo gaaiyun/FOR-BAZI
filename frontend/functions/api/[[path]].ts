@@ -9,6 +9,7 @@
  *      -> 转发到对方自己的服务商，用对方额度，不限次；顺带解决浏览器直连的 CORS。
  *   2. 持访问密钥（X-Access-Key 命中 ACCESS_KEYS）-> 用站长的模型，不限次。
  *   3. 匿名 -> 用站长的模型，按 IP 每日限次（RATE_LIMIT_KV）。
+ *      一次提问算一次，不管它内部和模型往返了几轮。
  *
  * 站长的模型：配置了 DEEPSEEK_API_KEY 时默认走 DeepSeek（DEEPSEEK_MODEL，默认 deepseek-flash）；
  * DeepSeek 在开始输出前出错（欠费、限流、宕机）就自动退回 Workers AI，站点不会因此不可用。
@@ -51,11 +52,31 @@ const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =
 
 const todayKey = (ip: string) => `anon:${new Date().toISOString().slice(0, 10)}:${ip}`;
 
+/** 一次解读内部最多允许多少次模型调用（工具往返 + 收尾）。 */
+const CALLS_PER_QUESTION = 12;
+
 async function checkQuota(env: Env, ip: string) {
   const limit = Number(env.ANON_DAILY_LIMIT ?? DEFAULT_ANON_LIMIT);
   const key = todayKey(ip);
-  const used = Number((await env.RATE_LIMIT_KV.get(key)) ?? "0");
-  return { limit, used, remaining: Math.max(0, limit - used), key };
+  const callsKey = `${key}:calls`;
+  const [usedRaw, callsRaw] = await Promise.all([env.RATE_LIMIT_KV.get(key), env.RATE_LIMIT_KV.get(callsKey)]);
+  const used = Number(usedRaw ?? "0");
+  const calls = Number(callsRaw ?? "0");
+  return { limit, used, remaining: Math.max(0, limit - used), key, callsKey, calls, callsCap: limit * CALLS_PER_QUESTION };
+}
+
+/**
+ * 这次调用是不是「一次提问」的第一轮。
+ *
+ * 一次解读要和模型往返好几轮（要工具 → 回工具结果 → …… → 正文），旧版每一轮都扣一次，
+ * 「每天 5 次」实际只够问一个问题。现在只在第一轮扣：最后一条是用户消息，
+ * 且它前面不是工具结果（收尾轮会在工具结果后追加一条用户消息，那不算新提问）。
+ */
+function isFirstTurn(body: Record<string, unknown>): boolean {
+  const msgs = Array.isArray(body.messages) ? (body.messages as Array<{ role?: string }>) : [];
+  const last = msgs[msgs.length - 1];
+  const prev = msgs[msgs.length - 2];
+  return last?.role === "user" && prev?.role !== "tool";
 }
 
 function isAllowedProvider(baseUrl: string): boolean {
@@ -123,9 +144,15 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
   let quotaKey = "";
   let quotaUsed = 0;
 
+  const firstTurn = isFirstTurn(body);
+  let callsKey = "";
+  let callsUsed = 0;
+
   if (!hasKey) {
     const q = await checkQuota(env, ip);
-    if (q.remaining <= 0) {
+    // 新提问：看今天还剩几次。后续轮次：不再扣次数，但受总调用数上限约束，
+    // 防止有人伪造「后续轮次」的消息来绕过限次。
+    if ((firstTurn && q.remaining <= 0) || q.calls >= q.callsCap) {
       return json(
         {
           error: "今日免费次数已用完。",
@@ -139,18 +166,22 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     }
     quotaKey = q.key;
     quotaUsed = q.used;
+    callsKey = q.callsKey;
+    callsUsed = q.calls;
     quotaHeaders = {
       "X-Quota-Limit": String(q.limit),
-      "X-Quota-Remaining": String(q.remaining - 1),
+      "X-Quota-Remaining": String(Math.max(0, q.remaining - (firstTurn ? 1 : 0))),
     };
   }
 
   const mode = hasKey ? "key" : "anonymous";
   const countUsage = async () => {
     // 计数放在成功之后：上游失败不该扣掉用户的免费次数。
-    if (!hasKey && quotaKey) {
-      await env.RATE_LIMIT_KV.put(quotaKey, String(quotaUsed + 1), { expirationTtl: 60 * 60 * 48 });
-    }
+    if (hasKey || !quotaKey) return;
+    const ttl = { expirationTtl: 60 * 60 * 48 };
+    const writes = [env.RATE_LIMIT_KV.put(callsKey, String(callsUsed + 1), ttl)];
+    if (firstTurn) writes.push(env.RATE_LIMIT_KV.put(quotaKey, String(quotaUsed + 1), ttl));
+    await Promise.all(writes);
   };
 
   const requested = typeof body.model === "string" ? body.model : "";
